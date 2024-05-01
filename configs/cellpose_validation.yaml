@@ -7,8 +7,9 @@ data:
 
 model:
     framework: cellpose                 # choose one of ["cellpose", "cell_profiler", "anystar"]
-    model_type: "cyto3"
+    model_type: "neurips_cellpose_default"
     channels: [[0, 0]]
+    n_channels: 3
 
 training:
     lr: 0.001
