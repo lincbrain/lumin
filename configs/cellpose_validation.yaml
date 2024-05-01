@@ -1,0 +1,36 @@
+expname: cellpose_validation
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+data:
+    batch_size: 1
+    data_dir: /om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg
+
+model:
+    framework: cellpose                 # choose one of ["cellpose", "cell_profiler", "anystar"]
+    model_type: "cyto3"
+    channels: [[0, 0]]
+
+training:
+    lr: 0.001
+    num_iters: 3000                            # number of iterations per epoch
+    epochs: 10                                  # number of epochs
+    early_stopping: 50                          # patience for early stopping
+    dropout: 0.5                                # probability of dropout regularization
+    log_root_dir: "/om2/user/ckapoor/lsm-segmentation/cellpose_validation"       # logging directory
+
+    i_backup: 1000                              # save every n steps
+    i_save: 900                                 # save every t seconds
+
+    monitoring: tensorboard                     # log progress on tensorboard
+
+    i_val: 2000                                 # validate every n steps
+
+    # checkpoint configs
+    ckpt_file: null
+    ckpt_ignore_keys: []
+    ckpt_only_use_keys: null
+
+    # set LR scheduler params
+    scheduler:
+        type: exponential_step
+        min_factor: 0.1
