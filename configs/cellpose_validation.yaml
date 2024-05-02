@@ -3,13 +3,17 @@ device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
 
 data:
     batch_size: 1
-    data_dir: /om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg
+    data_dir: /om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg-2/Testing/Hidden
 
 model:
     framework: cellpose                 # choose one of ["cellpose", "cell_profiler", "anystar"]
     model_type: "neurips_cellpose_default"
-    channels: [[0, 0]]
+    channels: None
     n_channels: 3
+    diameters: None
+    normalize: False
+    tile_overlap: 0.6
+    augment: True
 
 training:
     lr: 0.001

@@ -1,11 +1,12 @@
 import os
-import glob
 import numpy as np
+from glob import glob
 from tqdm import tqdm
+from pathlib import Path
 from typing import Optional
+from natsort import natsorted
 
-from skimage.io import imread
-from tifffile import imread as tiff_imread
+from cellpose import io, transforms
 
 import torch
 
@@ -13,46 +14,33 @@ from lsm.utils.io_util import glob_imgs
 
 
 class ImageDataset(torch.utils.data.Dataset):
-    def __init__(self, data_dir: str, split: Optional[str] = "Training"):
+    def __init__(self, data_dir: str, split: Optional[str] = "Testing"):
 
         assert os.path.exists(data_dir), f"Data directory does not exist"
 
-        self.root_dir = data_dir
+        self.data_dir = Path(data_dir)
+        fall = natsorted(glob((self.data_dir / "images" / "*").as_posix()))
+        img_files = [f for f in fall if "_masks" not in f and "_flows" not in f]
 
-        image_dir = f"{self.root_dir}/{split}/images/"
-        image_paths = sorted(glob_imgs(image_dir))
-        label_dir = f"{self.root_dir}/{split}/labels"
+        # self.imgs = [torch.from_numpy(io.imread(f)) for f in img_files]
+        self.imgs = [io.imread(f) for f in img_files]
 
-        self.images_all = []
-        self.labels_all = []
+        self.imgs_norm = []
+        for img in self.imgs:
+            if img.ndim == 2:
+                img = np.tile(img[:, :, np.newaxis], (1, 1, 3))
+            img = transforms.normalize_img(img, axis=-1)
+            self.imgs_norm.append(img.transpose(2, 0, 1))
 
-        # not all png files have corresponding masks for some reason
-        for image in tqdm(image_paths, f"Loading {split} images..."):
-            try:
-                img_name = image.split("/")[-1]
-                label_name = img_name[: img_name.rfind(".")] + "_label.tiff"
-                label_path = os.path.join(label_dir, label_name)
-
-                assert os.path.exists(label_path)
-
-                rgb = torch.from_numpy(imread(image))
-                label = torch.from_numpy(tiff_imread(label_path).astype(np.int16))
-
-                self.images_all.append(rgb)
-                self.labels_all.append(label)
-
-            except:
-                continue
-
-        self.n_images = len(self.images_all)
+        self.n_images = len(self.imgs)
 
     def __len__(self):
         return self.n_images
 
     def __getitem__(self, idx):
 
-        sample = {"rgb": self.images_all[idx]}
-        ground_truth = {"mask": self.labels_all[idx]}
+        sample = {"norm_rgb": self.imgs_norm[idx].astype(np.float32)}
+        ground_truth = {"orig_rgb": self.imgs[idx].astype(np.float32)}
 
         return idx, sample, ground_truth
 
@@ -74,11 +62,20 @@ class ImageDataset(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     # testing dataloader
-    data_dir = "/om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg"
+    data_dir = "/om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg-2/Testing/Hidden"
     data = ImageDataset(data_dir=data_dir, split="Training")
     _, sample, label = data[0]
-    rgb = sample["rgb"]
-    mask = label["mask"]
+    rgb = sample["norm_rgb"]
+    mask = label["orig_rgb"]
+
+    import cv2 as cv
+
+    for i, _ in enumerate(data):
+        _, norm, _ = data[i]
+        rgb = norm["norm_rgb"]
+        rgb = rgb.transpose(1, 2, 0)
+        print(f"rgb: {rgb.shape}")
+        cv.imwrite(f"{i}_norm_dl.png", rgb)
 
     print(f"rgb shape: {rgb.shape}\t mask shape: {mask.shape}")
     print(f"len: {len(data)}")

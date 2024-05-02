@@ -3,11 +3,15 @@ import torch
 import pickle
 import imageio
 import torchvision
+import cv2 as cv
 import numpy as np
 
 import torch.distributed as dist
 
 from lsm.utils.load_config import cond_mkdir
+
+color_map = np.random.randint(0, 256, (500, 3), dtype=np.uint8)
+color_map[0] = [0, 0, 0]
 
 
 class Logger(object):
@@ -66,17 +70,23 @@ class Logger(object):
         elif self.monitoring == "tensorboard":
             self.tb.add_scalar(k_name, v, it)
 
-    # def add_vector(self, category, k, vec, it):
-    #    if category not in self.stats:
-    #        self.stats[category] = {}
+    def add_imgs_eval(self, imgs, class_name, it, save_seg=False):
+        outdir = os.path.join(self.save_dir, class_name)
+        if self.is_master and not os.path.exists(outdir):
+            os.makedirs(outdir)
+        if self.multi_process_logging:
+            dist.barrier()
+        outfile = os.path.join(outdir, "{:08d}_{}.png".format(it, self.rank))
 
-    #    if k not in self.stats[category]:
-    #        self.stats[category][k] = []
+        # color map segmentation masks, if applicable
+        if save_seg:
+            imgs = color_map[imgs]
+        else:
+            imgs = imgs.squeeze(0).detach().cpu().numpy()
 
-    #    if isinstance(vec, torch.Tensor):
-    #        vec = vec.data.clone().cpu().numpy()
+        cv.imwrite(outfile, imgs)
 
-    #    self.stats[category][k].append((it, vec))
+        # potential TODO: log to tensorboard
 
     def add_imgs(self, imgs, class_name, it):
         outdir = os.path.join(self.save_dir, class_name)

@@ -14,16 +14,27 @@ class Cellpose(nn.Module):
     ):
         super(Cellpose, self).__init__()
 
+        self.model_config = model_config
         model_type = model_config["model_type"]
         self.channels = model_config["channels"]
-        self.n_channels = model_config["n_channels"]
+        self.n_channels = int(model_config["n_channels"])
         self.model = models.Cellpose(
             gpu=True, nchan=self.n_channels, model_type=model_type
         )
 
     def forward(self, x: torch.Tensor):
         masks, flows, styles, diams = self.model.eval(
-            x, diameter=None, channels=self.channels
+            x,
+            # diameter=self.model_config["diameters"],
+            diameter=None,
+            # channels=self.channels,
+            channels=None,
+            # normalize=self.model_config["normalize"],
+            normalize=False,
+            tile_overlap=0.6,
+            augment=True,
+            # tile_overlap=self.model_config["tile_overlap"],
+            # augment=self.model_config["augment"],
         )
 
         return masks
@@ -34,6 +45,10 @@ def get_model(args):
         "model_type": args.model.model_type,
         "channels": args.model.channels,
         "n_channels": args.model.n_channels,
+        "diameters": args.model.diameters,
+        "normalize": args.model.normalize,
+        "tile_overlap": args.model.tile_overlap,
+        "augment": args.model.augment,
     }
 
     model = Cellpose(model_config=model_config)
@@ -47,21 +62,31 @@ if __name__ == "__main__":
             "model_type": "neurips_cellpose_default",
             "channels": None,
             "n_channels": 3,
+            "diameters": None,
+            "normalize": False,
+            "tile_overlap": 0.6,
+            "augment": True,
         },
         device=torch.device("cuda:0"),
     )
     # test with 3-channel image batch
-    from skimage.io import imread
+    import cv2 as cv
+    import numpy as np
+    from cellpose import io, transforms
 
     img_path = (
         "/om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg/Training/images/cell_00902.png"
     )
-    img = torch.from_numpy(imread(img_path))
-    out = model(img)
-    import numpy as np
+    img = io.imread(img_path)
+    if img.ndim == 2:
+        img = np.tile(img[:, :, np.newaxis], (1, 1, 3))
+    img_norm = transforms.normalize_img(img, axis=-1)
+    out = model(img_norm)
+
+    color_map = np.random.randint(0, 256, (500, 3), dtype=np.uint8)
+    color_map[0] = [0, 0, 0]  # ensure black bg
+    seg_mask = color_map[out]
+    cv.imwrite(f"test_seg.png", seg_mask)
+    cv.imwrite(f"test_gt_img.png", img)
 
     print(f"uq: {np.unique(out)}")
-    import cv2 as cv
-
-    cv.imwrite("/om2/user/ckapoor/lsm-segmentation/test_00902.png", out)
-    print(f"out: {out.shape}")

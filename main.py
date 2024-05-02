@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import numpy as np
 from tqdm import tqdm
 
 import torch
@@ -19,6 +20,9 @@ from lsm.utils.distributed_util import (
     get_local_rank,
     get_world_size,
 )
+
+color_map = np.random.randint(0, 256, (500, 3), dtype=np.uint8)
+color_map[0] = [0, 0, 0]
 
 
 def main_function(args):
@@ -93,51 +97,31 @@ def main_function(args):
 
         while it <= len(dataset) and not end:
             try:
-                if args.ddp:
-                    raise NotImplementedError
                 for (indices, model_input, ground_truth) in dataloader:
                     int_it = int(it // world_size)
 
-                    # TODO: add predicted images
-                    _, rgb, labels = next(iter(valloader))
+                    norm_rgb = model_input["norm_rgb"]
+                    orig_rgb = ground_truth["orig_rgb"]
 
-                    gt_rgb = rgb["rgb"]
-                    gt_mask = labels["mask"]
+                    pred_mask = model(norm_rgb)
 
-                    import numpy as np
-
-                    predicted_masks = torch.from_numpy(model(gt_rgb).astype(np.uint8))
-
-                    print(f"gt rgb: {gt_rgb.dtype}")
-                    print(f"gt mask: {gt_mask.dtype}")
-                    print(f"pmask: {predicted_masks.dtype}")
-
-                    # logger.add_imgs(
-                    #    imgs=gt_rgb,
-                    #    class_name="gt_rgb",
-                    #    it=it,
-                    # )
-                    # logger.add_imgs(
-                    #    imgs=gt_mask,
-                    #    class_name="gt_mask",
-                    #    it=it,
-                    # )
-                    logger.add_imgs(
-                        imgs=predicted_masks,
-                        class_name="predicted_mask",
+                    # save images
+                    logger.add_imgs_eval(
+                        imgs=orig_rgb,
+                        class_name="gt_rgb",
                         it=it,
+                        save_seg=False,
+                    )
+                    logger.add_imgs_eval(
+                        imgs=pred_mask,
+                        class_name="pred_mask",
+                        it=it,
+                        save_seg=True,
                     )
 
                     if it >= len(dataset):
                         end = True
                         break
-
-                    start_time = time.time()
-
-                    end_time = time.time()
-                    log.debug(
-                        "One iteration time is {:.2f}".format(end_time - start_time)
-                    )
 
                     it += world_size
                     if is_master():
