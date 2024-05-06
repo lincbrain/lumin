@@ -5,6 +5,7 @@ import imageio
 import torchvision
 import cv2 as cv
 import numpy as np
+from tqdm import tqdm
 
 import torch.distributed as dist
 
@@ -55,22 +56,24 @@ class Logger(object):
                 'Monitoring tool "%s" not supported!' % monitoring
             )
 
-    def add(self, category, k, v, it):
-        if category not in self.stats:
-            self.stats[category] = {}
+    def add_imgs_3d(self, imgs, class_name, it, save_seg=False):
+        outdir = os.path.join(self.save_dir, class_name)
+        if self.is_master and not os.path.exists(outdir):
+            os.makedirs(outdir)
+        if self.multi_process_logging:
+            dist.barrier()
 
-        if k not in self.stats[category]:
-            self.stats[category][k] = []
+        for sl in tqdm(range(imgs.shape[-1]), desc=f"Saving image slices"):
+            outfile = os.path.join(outdir, "{:08d}_{}_{}.png".format(it, sl, self.rank))
+            if save_seg:
+                img = color_map[imgs[..., sl]]
+            else:
+                img = imgs[..., sl].squeeze(0).detach().cpu().numpy()
 
-        self.stats[category][k].append((it, v))
-
-        k_name = "%s/%s" % (category, k)
-        if self.monitoring == "telemetry":
-            self.tm.metric_push_async({"metric": k_name, "value": v, "it": it})
-        elif self.monitoring == "tensorboard":
-            self.tb.add_scalar(k_name, v, it)
+            cv.imwrite(outfile, img)
 
     def add_imgs_eval(self, imgs, class_name, it, save_seg=False):
+        # save 2d images
         outdir = os.path.join(self.save_dir, class_name)
         if self.is_master and not os.path.exists(outdir):
             os.makedirs(outdir)

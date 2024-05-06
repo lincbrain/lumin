@@ -23,6 +23,7 @@ class StarDist(nn.Module):
         # reshape tensor
         x = x.squeeze(0).permute(1, 2, 0)
         x = x.detach().cpu().numpy()
+        print(f"shape: {x.shape}")
 
         if self.normalize:
             x = normalize(x)
@@ -45,12 +46,12 @@ def get_model(args):
 
 if __name__ == "__main__":
     model = StarDist2D.from_pretrained("2D_versatile_he")
-    img_path = "/om2/user/ckapoor/lsm-segmentation/stardist_validation/stardist_validation/predictions/gt_rgb/00000014_0.png"
+    img_path = (
+        "/om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg/Training/images/cell_00902.png"
+    )
     img = cv.imread(img_path)
     labels, _ = model.predict_instances(normalize(img))
     import numpy as np
-
-    print(f"uq labels: {np.unique(labels)}")
 
     color_map = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
     color_map[0] = [0, 0, 0]
@@ -61,3 +62,4 @@ if __name__ == "__main__":
     cv.imwrite(f"stardist_orig.png", img)
     cv.imwrite(f"mask.png", seg_mask)
     # cv.imwrite(f"stardist_overlay_mask.png", overlay)
+    print(f"hello")

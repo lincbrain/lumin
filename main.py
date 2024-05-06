@@ -105,19 +105,37 @@ def main_function(args):
 
                     pred_mask = model(norm_rgb)
 
-                    # save images
-                    logger.add_imgs_eval(
-                        imgs=orig_rgb,
-                        class_name="gt_rgb",
-                        it=it,
-                        save_seg=False,
-                    )
-                    logger.add_imgs_eval(
-                        imgs=pred_mask,
-                        class_name="pred_mask",
-                        it=it,
-                        save_seg=True,
-                    )
+                    # check if we have worked with 3d data
+                    # save a single slice in that case
+                    if args.data_dim == "3D":
+                        logger.add_imgs_3d(
+                            imgs=orig_rgb,
+                            class_name="gt_rgb",
+                            it=it,
+                            save_seg=False,
+                        )
+                        logger.add_imgs_3d(
+                            imgs=pred_mask, class_name="pred_mask", it=it, save_seg=True
+                        )
+
+                    elif args.data_dim == "2D":
+                        # save images
+                        logger.add_imgs_eval(
+                            imgs=orig_rgb,
+                            class_name="gt_rgb",
+                            it=it,
+                            save_seg=False,
+                        )
+                        logger.add_imgs_eval(
+                            imgs=pred_mask,
+                            class_name="pred_mask",
+                            it=it,
+                            save_seg=True,
+                        )
+                    else:
+                        raise NotImplementedError(
+                            f"Data dimension: {args.data_dim} not supported. Try one of 2D/3D"
+                        )
 
                     if it >= len(dataset):
                         end = True

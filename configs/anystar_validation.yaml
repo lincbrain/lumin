@@ -1,0 +1,27 @@
+expname: anystar_validation
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+data_dim: "3D"
+
+data:
+    dataset_type: "anystar_nii"
+    batch_size: 1
+    data_dir: /om2/user/ckapoor/lsm-segmentation/anystar-data/NucMM-Z/
+
+model:
+    framework: anystar                  # choose one of ["cellpose", "cell_profiler", "anystar", "stardist"]
+    model_type: "anystar-mix"
+    normalize: True                     # normalize image intensities
+    basedir: "model-weights"            # base directory containing model weights
+    trainable: False                    # is the model trainable?
+    prob_thresh: 0.5                    # softmax detection threshold (lower val -> more detections)
+    nms_thresh: 0.3                     # non-maximum suppresion threshold (lower val -> greater suppresion)
+    scale: [1., 1., 1.]                 # resizing ratios per dimension (generally, default values work well)
+    n_tiles: (1, 1, 1)                  # number of tiles for sliding window
+
+training:
+    log_root_dir: "/om2/user/ckapoor/lsm-segmentation/anystar_validation"       # logging directory
+
+    monitoring: tensorboard                     # log progress on tensorboard
+
+    i_backup: 1000                              # save every n steps
+    i_val: 2000                                 # validate every n steps
