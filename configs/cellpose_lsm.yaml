@@ -1,0 +1,22 @@
+expname: cellpose_lsm
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+data:
+    batch_size: 1
+    data_dir: /om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg-2/Testing/Hidden
+
+model:
+    framework: cellpose                 # choose one of ["cellpose", "cell_profiler", "anystar"]
+    model_type: "nuclei"
+    channels: [[0, 0]]
+    n_channels: 2
+    diameters: 15
+    normalize: True
+    tile_overlap: 0.1
+    augment: False
+
+training:
+    dropout: 0.5                                # probability of dropout regularization
+    log_root_dir: "/om2/user/ckapoor/lsm-segmentation/cellpose_validation"       # logging directory
+
+    monitoring: tensorboard                     # log progress on tensorboard

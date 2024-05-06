@@ -1,0 +1,19 @@
+expname: stardist_validation
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+data:
+    batch_size: 1
+    data_dir: /om2/user/ckapoor/lsm-data/NeurIPS22-CellSeg-2/Testing/Hidden
+
+model:
+    framework: stardist # choose one of ["cellpose", "cell_profiler", "anystar", 'stardist']
+    model_type: "2D_versatile_he"
+    normalize: False
+
+training:
+    log_root_dir: "/om2/user/ckapoor/lsm-segmentation/stardist_validation"       # logging directory
+
+    monitoring: tensorboard                     # log progress on tensorboard
+
+    i_backup: 1000                              # save every n steps
+    i_val: 2000                                 # validate every n steps

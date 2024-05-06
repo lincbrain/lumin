@@ -25,16 +25,11 @@ class Cellpose(nn.Module):
     def forward(self, x: torch.Tensor):
         masks, flows, styles, diams = self.model.eval(
             x,
-            # diameter=self.model_config["diameters"],
-            diameter=None,
-            # channels=self.channels,
-            channels=None,
-            # normalize=self.model_config["normalize"],
-            normalize=False,
-            tile_overlap=0.6,
-            augment=True,
-            # tile_overlap=self.model_config["tile_overlap"],
-            # augment=self.model_config["augment"],
+            diameter=self.model_config["diameters"],
+            channels=self.channels,
+            normalize=self.model_config["normalize"],
+            tile_overlap=self.model_config["tile_overlap"],
+            augment=self.model_config["augment"],
         )
 
         return masks
@@ -57,6 +52,34 @@ def get_model(args):
 
 
 if __name__ == "__main__":
+    import os
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    model = Cellpose(
+        model_config={
+            "model_type": "nuclei",
+            "channels": [[0, 0]],
+            "n_channels": 2,
+            "diameters": 15,
+            "normalize": True,
+            "tile_overlap": 0.1,
+            "augment": True,
+        },
+        device=torch.device("cuda:0"),
+    )
+    import cv2 as cv
+    import numpy as np
+
+    img_path = f"/om2/user/ckapoor/lsm-segmentation/test-lsm.png"
+    img = cv.imread(img_path)
+
+    out = model(img)
+    color_map = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
+    color_map[0] = [0, 0, 0]
+    seg_mask = color_map[out]
+    overlay = cv.addWeighted(img, 0.7, seg_mask, 0.3, 0)
+    cv.imwrite(f"overlay_lsm_seg.png", overlay)
+
     model = Cellpose(
         model_config={
             "model_type": "neurips_cellpose_default",
