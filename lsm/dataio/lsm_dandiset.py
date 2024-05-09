@@ -79,19 +79,18 @@ if __name__ == "__main__":
     url = "https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/"
     reader = Reader(parse_url(url))
     dask_data = list(reader())[0].data
-    scale = 2
+    scale = 0
     vol_scale = dask_data[scale]
-    vol = vol_scale[0][0]  # (z, y, x)
+    print(f"vs: {vol_scale}")
+    # vol = vol_scale[0][0]  # (z, y, x)
 
     from tifffile import imsave
 
-    print(f"shape: {vol.shape}")
-    print(f"dtype: {vol[100].dtype}")
+    # print(f"dtype: {vol[100].dtype}")
     # color_map = np.random.randint(0, 256, (25890, 3), dtype=np.uint8)
     # color_map[0] = [0, 0, 0]
     # sl = color_map[sl]
     # print(f"uq: {np.unique(sl)}")
-    imsave(f"test_sl100.tiff", vol[100])
 
     # d = ImageDataset(url=url, scale=3)
     # _, model_ip, gt = d[500]

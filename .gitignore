@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# slurm scripts + log files
+*.sh
+*.out
+*.err
+
 # C extensions
 *.so
 
@@ -85,6 +90,7 @@ target/
 *.png
 *.jpg
 *.npy
+*.tiff
 
 # results directory
 result/
