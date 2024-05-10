@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     assert len(baseimagepaths) == len(basesegpaths)
 
-    for i in tqdm(range(len(baseimagepaths))):
+    for i in range(len(baseimagepaths)):
         print(
             "Running {} which is {}/{}".format(
                 baseimagepaths[i], i + 1, len(baseimagepaths)
@@ -165,66 +165,50 @@ if __name__ == "__main__":
 
         # augment each gmmXperlin sampled image n_offline_augmentations times:
         for j in tqdm(
-            range(n_offline_augmentations),
-            desc=f"Augmenting gmmXperlin sampled images...",
+            range(n_offline_augmentations), desc=f"Augmenting gmmXperlin images..."
         ):
             for batch_data in tqdm(train_loader):
                 inputs, labels = batch_data["image"], batch_data["label"]
-
-                inputs = inputs.to("cuda:0")
-                labels = labels.to("cuda:0")
-                if inputs.squeeze().sum().item == 0:
+                if inputs.squeeze().data.sum() == 0:
                     continue
-                nonzero = (inputs.squeeze() > 0).to(torch.float32)
+                nonzero = (inputs.squeeze().data > 0).astype(np.float32)
                 if np.random.uniform(0, 1) < 0.2:
                     noise_choice = np.random.choice(["gaussian", "poisson", "speckle"])
-                    inputs = inputs.cpu()
-                    img = random_noise(inputs.squeeze(), mode=noise_choice)
-                    img = torch.from_numpy(img).to("cuda:0")
+                    img = random_noise(inputs.squeeze().data, mode=noise_choice)
                     img = img * nonzero
                 else:
-                    img = 1.0 * inputs.squeeze()
+                    img = 1.0 * inputs.squeeze().data
 
-                monai.data.write_nifti(
-                    img,
+                imgpath = (
                     imagelocs
                     + os.path.basename(inputs.meta["filename_or_obj"][0])[:-7]
-                    + "_v{}.nii.gz".format(j),
-                    affine=np.eye(4),
+                    + "_v{}.nii.gz".format(j)
                 )
 
-                separate_labels = (
-                    torch.unique(labels.squeeze()).to(torch.uint16).cpu().numpy()
-                )
-                monai.data.write_nifti(
-                    separate_labels,
+                if not os.path.exists(imgpath):
+                    monai.data.write_nifti(
+                        img,
+                        imagelocs
+                        + os.path.basename(inputs.meta["filename_or_obj"][0])[:-7]
+                        + "_v{}.nii.gz".format(j),
+                        affine=np.eye(4),
+                    )
+                else:
+                    print(f"{imgpath} exists, skipping augmentation...")
+                separate_labels = unique_label(labels.squeeze().data).astype(np.uint16)
+
+                segpath = (
                     seglocs
                     + os.path.basename(labels.meta["filename_or_obj"][0])[:-7]
-                    + "_v{}.nii.gz".format(j),
-                    affine=np.eye(4),
+                    + "_v{}.nii.gz".format(j)
                 )
-
-                # if inputs.squeeze().data.sum() == 0:
-                #    continue
-                # nonzero = (inputs.squeeze().data > 0).astype(np.float32)
-                # if np.random.uniform(0, 1) < 0.2:
-                #    noise_choice = np.random.choice(["gaussian", "poisson", "speckle"])
-                #    img = random_noise(inputs.squeeze().data, mode=noise_choice)
-                #    img = img * nonzero
-                # else:
-                #    img = 1.0 * inputs.squeeze().data
-                # monai.data.write_nifti(
-                #    img,
-                #    imagelocs
-                #    + os.path.basename(inputs.meta["filename_or_obj"][0])[:-7]
-                #    + "_v{}.nii.gz".format(j),
-                #    affine=np.eye(4),
-                # )
-                # separate_labels = unique_label(labels.squeeze().data).astype(np.uint16)
-                # monai.data.write_nifti(
-                #    separate_labels,
-                #    seglocs
-                #    + os.path.basename(labels.meta["filename_or_obj"][0])[:-7]
-                #    + "_v{}.nii.gz".format(j),
-                #    affine=np.eye(4),
-                # )
+                if not os.path.exists(segpath):
+                    monai.data.write_nifti(
+                        separate_labels,
+                        seglocs
+                        + os.path.basename(labels.meta["filename_or_obj"][0])[:-7]
+                        + "_v{}.nii.gz".format(j),
+                        affine=np.eye(4),
+                    )
+                else:
+                    print(f"{segpath} exists, skipping augmentation...")

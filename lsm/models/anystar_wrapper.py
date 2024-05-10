@@ -111,33 +111,39 @@ if __name__ == "__main__":
     model.trainable = False
     model.keras_model.trainable = False
 
-    fpath = "/om2/user/ckapoor/lsm-segmentation/anystar-data/NucMM-Z/img_0320_0704_0640.nii.gz"
-    img = nib.load(fpath).get_fdata()
-    # print(f"type: {type(img)}")
-    # normalize intensties
-    img_norm = (img - img.max()) / (img.max() - img.min())
-    im_slice = img_norm
+    # fpath = "/om2/user/ckapoor/lsm-segmentation/anystar-data/NucMM-Z/img_0320_0704_0640.nii.gz"
+    # img = nib.load(fpath).get_fdata()
+    ## print(f"type: {type(img)}")
+    ## normalize intensties
+    # img_norm = (img - img.max()) / (img.max() - img.min())
+    # print(f"norm: {img_norm.shape}")
 
     # labels, _ = model.predict_instances(
-    #    im_slice,
+    #    img_norm,
     #    prob_thresh=0.5,
     #    n_tiles=(1, 1, 1),
     #    nms_thresh=0.3,
     #    scale=[1.0, 1.0, 1.0],
     # )
 
+    cmap = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
+    cmap[0] = [0, 0, 0]
+
     import cv2 as cv
+
+    # for i in [35, 45]:
+    #    cv.imwrite(f"{i}_gt.png", img[..., i])
+    #    seg = cmap[labels[..., i]]
+    #    cv.imwrite(f"{i}_mask.png", seg)
 
     # visualize some intermediate slices
     # print(f"uq labels: {np.unique(labels)}")
     # labels = labels[..., 40]
-    cmap = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
-    cmap[0] = [0, 0, 0]
 
     # seg_mask = cmap[labels]
     # print(f"labels shape: {labels.shape}")
     # cv.imwrite(f"anystar_gt.png", img[..., 40])
-    # cv.imwrite(f"anystar_mask.png", seg_mask)
+    # cv.imwrite(f"anystar_mask.png", seg_mask[..., 40])
 
     from ome_zarr.io import parse_url
     from ome_zarr.reader import Reader
@@ -145,67 +151,56 @@ if __name__ == "__main__":
     url = "https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/"
     reader = Reader(parse_url(url))
     dask_data = list(reader())[0].data
-    scale = 3
-    vol_scale = dask_data[scale][0][0]
+    scale = 2
+    vol_scale = dask_data[scale][0][0].compute(scheduler="single-threaded")
+    vol_scale = np.transpose(vol_scale, (2, 1, 0))
 
-    print(f"vs: {vol_scale.shape}")
-    vol_slice = vol_scale[100:200, ...].compute()
-    vol_norm = (vol_slice - vol_slice.max()) / (vol_slice.max() - vol_slice.min())
+    # rescale to (64, 64, 64) voxel for anystar
+    sx, sy, sz = (
+        vol_scale.shape[0] // 64,
+        vol_scale.shape[1] // 64,
+        vol_scale.shape[2] // 64,
+    )
+    from scipy.ndimage import zoom
 
-    print(f"max: {vol_slice.max()}")
-    print(f"min: {vol_slice.min()}")
+    vol_scale = zoom(vol_scale, (1 / sx, 1 / sy, 1 / sz))
 
-    from tqdm import tqdm
+    print(f"dd: {vol_scale.shape}")
+    vol_norm = (vol_scale - vol_scale.max()) / (vol_scale.max() - vol_scale.min())
 
-    # vol_chunk = vol_norm[1000:1100, ...]
+    # vol_slice = vol_scale[100:150, ...].compute()
+    # vol_norm = (vol_slice - vol_slice.max()) / (vol_slice.max() - vol_slice.min())
+
+    print(f"max: {vol_scale.max()}")
+    print(f"min: {vol_scale.min()}")
+
+    # from tqdm import tqdm
+
+    ## vol_chunk = vol_norm[1000:1100, ...]
     labels, _ = model.predict_instances(
         vol_norm,
         prob_thresh=0.5,
         n_tiles=(1, 1, 1),
         nms_thresh=0.3,
         scale=[1.0, 1.0, 1.0],
-        show_tile_progress=True,
     )
     print(f"uq: {np.unique(labels)}")
 
-    color_map = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
-    color_map[0] = [0, 0, 0]
-
     from tifffile import imsave
 
-    for i in [50, 70]:
+    for i in [20, 30]:
         print(f"saving: {i}")
-        seg = color_map[labels[i, ...]]
-        imsave(f"gt_img_anystar_{i+100}.tiff", vol_scale[i + 100, ...])
-        imsave(f"pred_seg_anystar_{i+100}.tiff", seg[i, ...])
+        seg = color_map[labels[..., i]]
+        imsave(f"gt_img_anystar_{i}.tiff", vol_scale[..., i])
+        imsave(f"pred_seg_anystar_{i}.tiff", seg[..., i])
+    # color_map = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
+    # color_map[0] = [0, 0, 0]
 
-    # for i in tqdm(range(0, array_shape[0], chunk_size[0]), desc="iterating along z"):
-    #    for j in tqdm(
-    #        range(0, array_shape[1], chunk_size[1]), desc="iterating along y"
-    #    ):
-    #        for k in tqdm(
-    #            range(0, array_shape[2], chunk_size[2]), desc="iterating along x"
-    #        ):
-
-    #            chunk = vol_norm[
-    #                i : i + chunk_size[0], j : j + chunk_size[1], k : k + chunk_size[2]
-    #            ]
-    #            # segment a chunk
-    #            labels, _ = model.predict_instances(
-    #                chunk,
-    #                prob_thresh=0.5,
-    #                n_tiles=(1, 1, 1),
-    #                nms_thresh=0.3,
-    #                scale=[1.0, 1.0, 1.0],
-    #            )
-
-    #            if len(np.unique(labels)) > 1:
-    #                viz_seg.append(labels)
-    #                viz_gt.append(chunk)
-
-    # naive loop chunking
-
-    # for i in range()
+    # for i in [50, 70]:
+    #    print(f"saving: {i}")
+    #    seg = color_map[labels[i, ...]]
+    #    imsave(f"gt_img_anystar_{i+100}.tiff", vol_scale[i + 100, ...])
+    #    imsave(f"pred_seg_anystar_{i+100}.tiff", seg[i, ...])
 
     # labels, _ = model.predict_instances_big(
     #    img=vol_scale,
@@ -226,10 +221,6 @@ if __name__ == "__main__":
     #    nms_thresh=0.3,
     #    scale=[1.0, 1.0, 1.0],
     # )
-    # for i in [35, 45]:
-    #    cv.imwrite(f"{i}_gt.png", img[..., i])
-    #    seg = cmap[labels[..., i]]
-    #    cv.imwrite(f"{i}_mask.png", seg)
 
     # seg_mask = color_map[labels]
     # cv.imwrite(f"anystar_mask.png", labels)
