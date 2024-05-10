@@ -145,54 +145,59 @@ if __name__ == "__main__":
     # cv.imwrite(f"anystar_gt.png", img[..., 40])
     # cv.imwrite(f"anystar_mask.png", seg_mask[..., 40])
 
+    from tifffile import imwrite
     from ome_zarr.io import parse_url
     from ome_zarr.reader import Reader
 
     url = "https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/"
     reader = Reader(parse_url(url))
     dask_data = list(reader())[0].data
-    scale = 2
-    vol_scale = dask_data[scale][0][0].compute(scheduler="single-threaded")
-    vol_scale = np.transpose(vol_scale, (2, 1, 0))
+    scale = 0
+    vol_scale = dask_data[scale][0][0]
 
-    # rescale to (64, 64, 64) voxel for anystar
-    sx, sy, sz = (
-        vol_scale.shape[0] // 64,
-        vol_scale.shape[1] // 64,
-        vol_scale.shape[2] // 64,
+    # take an arbitrary (64, 64, 64) voxel
+    chunk_size = 256
+    voxel = vol_scale[
+        1500 : 1500 + chunk_size, 2000 : 2000 + chunk_size, 3000 : 3000 + chunk_size
+    ].compute()
+
+    print(f"voxel shape: {voxel.shape}")
+    # save voxel for sanity check
+    imwrite(f"dandiset_subvoxel.tiff", voxel)
+
+    # normalize voxel
+    voxel_norm = (voxel - voxel.min()) / ((voxel.max() - voxel.min()))
+    labels, _ = model.predict_instances(
+        voxel_norm,
+        prob_thresh=0.5,
+        n_tiles=(1, 1, 1),
+        nms_thresh=0.3,
+        scale=[0.25, 0.25, 0.25],
     )
-    from scipy.ndimage import zoom
 
-    vol_scale = zoom(vol_scale, (1 / sx, 1 / sy, 1 / sz))
-
-    print(f"dd: {vol_scale.shape}")
-    vol_norm = (vol_scale - vol_scale.max()) / (vol_scale.max() - vol_scale.min())
-
-    # vol_slice = vol_scale[100:150, ...].compute()
-    # vol_norm = (vol_slice - vol_slice.max()) / (vol_slice.max() - vol_slice.min())
-
-    print(f"max: {vol_scale.max()}")
-    print(f"min: {vol_scale.min()}")
+    imwrite(f"label_vol_subvoxel.tiff", labels)
+    print(f"max: {voxel_norm.max()}")
+    print(f"min: {voxel_norm.min()}")
 
     # from tqdm import tqdm
 
     ## vol_chunk = vol_norm[1000:1100, ...]
-    labels, _ = model.predict_instances(
-        vol_norm,
-        prob_thresh=0.5,
-        n_tiles=(1, 1, 1),
-        nms_thresh=0.3,
-        scale=[1.0, 1.0, 1.0],
-    )
-    print(f"uq: {np.unique(labels)}")
+    # labels, _ = model.predict_instances(
+    #    vol_norm,
+    #    prob_thresh=0.5,
+    #    n_tiles=(1, 1, 1),
+    #    nms_thresh=0.3,
+    #    scale=[1.0, 1.0, 1.0],
+    # )
+    # print(f"uq: {np.unique(labels)}")
 
-    from tifffile import imsave
+    # from tifffile import imsave
 
-    for i in [20, 30]:
-        print(f"saving: {i}")
-        seg = color_map[labels[..., i]]
-        imsave(f"gt_img_anystar_{i}.tiff", vol_scale[..., i])
-        imsave(f"pred_seg_anystar_{i}.tiff", seg[..., i])
+    # for i in [20, 30]:
+    #    print(f"saving: {i}")
+    #    seg = color_map[labels[..., i]]
+    #    imsave(f"gt_img_anystar_{i}.tiff", vol_scale[..., i])
+    #    imsave(f"pred_seg_anystar_{i}.tiff", seg[..., i])
     # color_map = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
     # color_map[0] = [0, 0, 0]
 
