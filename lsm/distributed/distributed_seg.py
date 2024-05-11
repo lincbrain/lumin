@@ -10,6 +10,9 @@ import numpy as np
 import dask.array as da
 
 
+# TODO: add typing
+
+
 def link_labels(block_labeled, total, depth, iou_threshold=1):
     """build a label connectivity graph that groups labels across blocks,
     use this graph to find connected components, and then relabel each
