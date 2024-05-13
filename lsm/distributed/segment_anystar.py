@@ -99,7 +99,7 @@ def segment_anystar(
         block_labeled = link_labels(
             block_labeled,
             total,
-            iou_depth=iou_depth,
+            depth=iou_depth,
             iou_threshold=iou_threshold,
         )
 
