@@ -1,3 +1,4 @@
+import os
 import operator
 import functools
 import numpy as np
@@ -16,11 +17,12 @@ from lsm.distributed.distributed_seg import link_labels
 
 def segment_cellpose(
     image: dask.array,
+    debug: Optional[bool] = False,
     channels: Optional[List[int]] = [[0, 0]],
     model_type: Optional[str] = "nuclei",
     boundary: Optional[str] = "reflect",
     diameter: Tuple[float] = None,
-    chunk: Optional[bool] = None,
+    chunk: Optional[int] = None,
     use_anisotropy: Optional[bool] = True,
     iou_depth: Optional[int] = 2,
     iou_threshold: Optional[float] = 0.7,
@@ -55,16 +57,12 @@ def segment_cellpose(
     )
 
     labeled_blocks = np.empty(image.numblocks[:-1], dtype=object)
+    # initialize empty "grid" for chunks
+    if debug:
+        unlabeled_blocks = np.empty(image.numblocks[:-1], dtype=object)
+
     total = None
     for index, input_block in tqdm(block_iter, desc="lazy computing chunks..."):
-        # normalize chunk before processing
-        # channel_axis = -1  # explicitly assuming the last axis
-        # input_block = input_block.astype(np.float32)
-        # input_block = da.moveaxis(input_block, channel_axis, 0)
-        # input_block = process_chunk(chunk=input_block)
-        ## put the channel axis back where it was
-        # input_block = da.moveaxis(input_block, 0, channel_axis)
-        # input_block = da.asarray(input_block)
 
         labeled_block, n = dask.delayed(segment_cellpose_chunk, nout=2)(
             chunk=input_block,
@@ -89,8 +87,25 @@ def segment_cellpose(
         labeled_blocks[index[:-1]] = labeled_block
         total += n
 
+        if debug:
+            # do the same thing, but assign the same label to *every* chunk
+            # here, we change the image to be 4D, to account for a newly
+            # introduced color channel
+            unlabeled_block = labeled_block
+            nz_mask = (unlabeled_block != 0).astype(
+                np.uint8
+            )  # find non-zero pixel locations
+            unlabeled_block = np.zeros(
+                unlabeled_block.shape + (3,), dtype=np.uint8
+            )  # add a color channel
+            unlabeled_block[nz_mask] = np.random.randint(0, 256, size=(3,))
+            unlabeled_blocks[index[:-1]] = unlabeled_block
+
     # put all blocks together
     block_labeled = da.block(labeled_blocks.tolist())
+
+    if debug:
+        block_unlabeled = da.block(unlabeled_blocks.tolist())
 
     depth = da.overlap.coerce_depth(len(depth), depth)
 
@@ -104,9 +119,17 @@ def segment_cellpose(
         block_labeled = da.overlap.trim_internal(
             block_labeled, trim_depth, boundary=boundary
         )
+
+        # trim excess, due to reflections
+        if debug:
+            block_unlabeled = da.overlap.trim_internal(
+                block_unlabeled, trim_depth, boundary=boundary
+            )
+
         block_labeled = link_labels(
             block_labeled, total, iou_depth, iou_threshold=iou_threshold
         )
+
         block_labeled = da.overlap.trim_internal(
             block_labeled, iou_depth, boundary=boundary
         )
@@ -115,6 +138,13 @@ def segment_cellpose(
         block_labeled = da.overlap.trim_internal(
             block_labeled, depth, boundary=boundary
         )
+        if debug:
+            block_unlabeled = da.overlap.trim_internal(
+                block_unlabeled, depth, boundary=boundary
+            )
+
+    if debug:
+        return block_labeled, block_unlabeled
 
     return block_labeled
 
@@ -162,12 +192,21 @@ if __name__ == "__main__":
         1000 : 1000 + chunk_size, 650 : 650 + chunk_size, 3500 : 3500 + chunk_size
     ]
 
-    seg_vol = segment_cellpose(image=voxel, diameter=(7.5, 7.5, 7.5))
-
     from tifffile import imsave
 
-    with ProgressBar():
-        with dask.config.set(scheduler="synchronous"):
-            seg_vol = seg_vol.compute()
-            imsave(f"distributed_cellpose.tiff", seg_vol)
-            imsave(f"distributed_gt.tiff", voxel.compute())
+    debug_dir = f"./chunk64_debug"
+    if not os.path.exists(debug_dir):
+        os.makedirs(debug_dir)
+
+    chunks = [20, 25, 30, 35, 40, 45, 50, 55]
+
+    for chunk in tqdm(chunks):
+        seg_vol, debug_vol = segment_cellpose(
+            image=voxel, diameter=(7.5, 7.5, 7.5), debug=True, chunk=chunk
+        )
+
+        with ProgressBar():
+            with dask.config.set(scheduler="synchronous"):
+                seg_vol = seg_vol.compute()
+                imsave(f"./{debug_dir}/seg_cellpose_chunk{chunk}.tiff", seg_vol)
+                imsave(f"./{debug_dir}/debug_cellpose_chunk{chunk}.tiff", debug_vol)
