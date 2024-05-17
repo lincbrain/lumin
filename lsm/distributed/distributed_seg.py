@@ -1,5 +1,6 @@
 # heavily borrowed from:
-# https://github.com/GFleishman/cellpose/blob/f930c697fa61024ce6f6b95fc70c3a5acf869eac/cellpose/contrib/distributed_segmentation.py
+# 1. https://github.com/GFleishman/cellpose/blob/f930c697fa61024ce6f6b95fc70c3a5acf869eac/cellpose/contrib/distributed_segmentation.py
+# 2. https://github.com/dask/dask-image/blob/ec39605527f2e41012df1ec7e50634ee46469588/dask_image/ndmeasure/__init__.py#L263
 
 
 """
@@ -8,15 +9,18 @@ segment detected regions using a chunked dask array
 import dask
 import numpy as np
 import dask.array as da
+from sklearn import metrics as sk_metrics
+from dask_image.ndmeasure._utils import _label
 
 
 # TODO: add typing
 
 
 def link_labels(block_labeled, total, depth, iou_threshold=1):
-    """build a label connectivity graph that groups labels across blocks,
+    """
+    build a label connectivity graph that groups labels across blocks,
     use this graph to find connected components, and then relabel each
-    block according to those
+    block according to those.
     """
     label_groups = label_adjacency_graph(block_labeled, total, depth, iou_threshold)
     new_labeling = _label.connected_components_delayed(label_groups)
@@ -24,9 +28,6 @@ def link_labels(block_labeled, total, depth, iou_threshold=1):
 
 
 def label_adjacency_graph(labels, nlabels, depth, iou_threshold):
-    """compute adjacency graph to determine connected components
-    across dask array chunks
-    """
     all_mappings = [da.empty((2, 0), dtype=np.int32, chunks=1)]
 
     slices_and_axes = get_slices_and_axes(labels.chunks, labels.shape, depth)
@@ -41,7 +42,7 @@ def label_adjacency_graph(labels, nlabels, depth, iou_threshold):
 
 
 def _across_block_iou_delayed(face, axis, iou_threshold):
-    """Delayed computation of cross-block IOU"""
+    """Delayed version of :func:`_across_block_label_grouping`."""
     _across_block_label_grouping_ = dask.delayed(_across_block_label_iou)
     grouped = _across_block_label_grouping_(face, axis, iou_threshold)
     return da.from_delayed(grouped, shape=(2, np.nan), dtype=np.int32)
@@ -57,7 +58,7 @@ def _across_block_label_iou(face, axis, iou_threshold):
 
     union = sum0 + sum1 - intersection
 
-    # Ignore errors with divide by zero, which the np.where sets to zero.
+    # ignore errors with divide by zero, which the np.where sets to zero.
     with np.errstate(divide="ignore", invalid="ignore"):
         iou = np.where(intersection > 0, intersection / union, 0)
 
@@ -67,8 +68,7 @@ def _across_block_label_iou(face, axis, iou_threshold):
     labels1_orig = unique[labels1]
     grouped = np.stack([labels0_orig, labels1_orig])
 
-    # discard background pixels
-    valid = np.all(grouped != 0, axis=0)
+    valid = np.all(grouped != 0, axis=0)  # Discard any mappings with bg pixels
     return grouped[:, valid]
 
 

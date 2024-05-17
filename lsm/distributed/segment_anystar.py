@@ -349,8 +349,8 @@ if __name__ == "__main__":
     # note: the model class implementation is *much* slower than
     # standalone functions (idk why this should be the case -> object
     # attribute lookup?)
-    seg_vol = model.forward(vol=vol_scale)
-    # seg_vol = segment_anystar(image=vol_scale)
+    # seg_vol = model.forward(vol=vol_scale)
+    seg_vol = segment_anystar(image=vol_scale)
 
     ## segment on a single GPU, with serial chunks
 
