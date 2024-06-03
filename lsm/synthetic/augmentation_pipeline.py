@@ -126,12 +126,14 @@ if __name__ == "__main__":
 
     train_transforms = get_transforms()
 
-    baseimg = "../generative_model/outputs/training_images/"
-    baseseg = "../generative_model/outputs/training_labels/"
+    baseimg = "../generative_model_steerable_gaussians/outputs/training_images/"
+    baseseg = "../generative_model_steerable_gaussians/outputs/training_labels/"
     baseimagepaths = sorted(
-        glob.glob("../generative_model/outputs/gmm_perlin_images/*")
+        glob.glob("../generative_model_steerable_gaussians/outputs/gmm_perlin_images/*")
     )
-    basesegpaths = sorted(glob.glob("../generative_model/outputs/gmm_perlin_labels/*"))
+    basesegpaths = sorted(
+        glob.glob("../generative_model_steerable_gaussians/outputs/gmm_perlin_labels/*")
+    )
 
     assert len(baseimagepaths) == len(basesegpaths)
 

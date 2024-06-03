@@ -1,10 +1,11 @@
 import numpy as np
+import cv2 as cv
 import argparse
 import nibabel as nib
 from tqdm import tqdm
 import tensorflow as tf
 import glob, os, natsort
-from scipy import ndimage as ndi
+from scipy.ndimage import convolve
 
 from skimage.transform import resize
 from skimage.measure import label as unique_label
@@ -17,29 +18,47 @@ from lsm.synthetic.synthseg_utils import (
 import voxelmorph as vxm
 import neurite as ne
 
+from scipy.ndimage import rotate
+
+
+def gaussian_3d_kernel(size, sigma):
+    x = np.random.normal(0, 1, size[0])
+    y = np.random.normal(0, 1, size[1])
+    z = np.random.normal(0, 1, size[2])
+
+    x, y, z = np.meshgrid(x, y, z, indexing="ij")
+
+    distance = np.sqrt(x**2 + y**2 + z**2)
+    kernel = np.exp(-(distance**2 / (2.0 * sigma**2)))
+    kernel = kernel / np.sum(kernel)
+    return kernel
+
+
+def rotate_3d_kernel(kernel, angles):
+    rotated_kernel = rotate(kernel, angle=angles[0], axes=(1, 2), reshape=False)
+    rotated_kernel = rotate(rotated_kernel, angle=angles[1], axes=(0, 2), reshape=False)
+    rotated_kernel = rotate(rotated_kernel, angle=angles[2], axes=(0, 1), reshape=False)
+    return rotated_kernel
+
 
 if __name__ == "__main__":
-    np.random.seed(12345)
+    np.random.seed(6969)
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--n_imgs",
         type=int,
-        default=300,
+        default=10,
         help="number of GMM images to sample from each synthesized label map",
     )
     args = parser.parse_args()
     nimgs = args.n_imgs
 
-    segpath_base = (
-        "../generative_model/outputs/initial_labels/"  # step 1 initial synth labels
-    )
-    imgpath_base = (
-        "../generative_model/outputs/gmm_perlin_images/"  # location for step2 imgs
-    )
-    labpath_base = (
-        "../generative_model/outputs/gmm_perlin_labels/"  # location for step2 labs
-    )
+    root_dir = f"/om2/user/ckapoor/generative_model_steerable_gaussians/"
+
+    segpath_base = f"{root_dir}/outputs/initial_labels/"  # step 1 initial synth labels
+    imgpath_base = f"{root_dir}/outputs/gmm_perlin_images/"  # location for step2 imgs
+    labpath_base = f"{root_dir}/outputs/gmm_perlin_labels/"  # location for step2 labs
     segs = natsort.natsorted(glob.glob(segpath_base + "/*.nii.gz"))
 
     for i in tqdm(range(len(segs))):
@@ -204,9 +223,26 @@ if __name__ == "__main__":
 
             # Create background:
             if backgnd_mode == "plain" or backgnd_mode == "rand":
-                synthimage[current_labels == 0] = synthimage[
-                    current_labels == 0
-                ] * np.mean(randperl[current_labels == 0])
+                # convolve random noise with a 3d steerable gaussian
+                test_kernel = gaussian_3d_kernel(size=(7, 7, 7), sigma=1.0)
+                theta = np.random.uniform(0, 360)
+                psi = np.random.uniform(0, 360)
+                phi = np.random.uniform(-90, 90)
+                rotate_kernel = rotate_3d_kernel(
+                    kernel=test_kernel, angles=(theta, phi, psi)
+                )
+                x = np.random.randn(128, 128, 128)
+                steerable_random_conv = convolve(x, rotate_kernel)
+                # alpha blend random noise with foreground
+                alpha = 0.01
+                synthimage = cv.addWeighted(
+                    synthimage,
+                    alpha,
+                    steerable_random_conv.astype("float32"),
+                    1 - alpha,
+                    0,
+                )
+
             elif backgnd_mode == "perlin":
                 synthlayer = SampleConditionalGMM(idx_texture_labels)
                 synthbackground = synthlayer(
@@ -225,9 +261,23 @@ if __name__ == "__main__":
                         ),
                     ]
                 )[0, ..., 0].numpy()
-                synthimage[current_labels == 0] = synthbackground[
-                    current_labels == 0
-                ] * np.mean(randperl[current_labels == 0])
+                perlin_kernel = gaussian_3d_kernel(size=(7, 7, 7), sigma=1.0)
+                # note that all angles are in degrees
+                theta = np.random.uniform(0, 360)
+                psi = np.random.uniform(0, 360)
+                phi = np.random.uniform(-90, 90)
+                rotate_perlin_kernel = rotate_3d_kernel(
+                    kernel=perlin_kernel, angles=(theta, phi, psi)
+                )
+                steerable_perlin_conv = convolve(synthbackground, rotate_perlin_kernel)
+                alpha = 0.8
+                # alpha blend perlin noise with foreground
+                synthimage = cv.addWeighted(
+                    synthimage, alpha, steerable_perlin_conv, 1 - alpha, 0
+                )
+                # synthimage[current_labels == 0] = synthbackground[
+                #    current_labels == 0
+                # ] * np.mean(randperl[current_labels == 0])
                 del synthlayer
 
             nib.save(

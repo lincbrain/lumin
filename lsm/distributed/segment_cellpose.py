@@ -86,20 +86,25 @@ def segment_cellpose(
 
         labeled_blocks[index[:-1]] = labeled_block
         total += n
+        print(f"labeled shape: {labeled_block.shape}")
 
         if debug:
             # do the same thing, but assign the same label to *every* chunk
             # here, we change the image to be 4D, to account for a newly
             # introduced color channel
             unlabeled_block = labeled_block
+            colored_chunk = unlabeled_block.copy()
             nz_mask = (unlabeled_block != 0).astype(
-                np.uint8
+                np.int32
             )  # find non-zero pixel locations
-            unlabeled_block = np.zeros(
-                unlabeled_block.shape + (3,), dtype=np.uint8
+            colored_chunk = np.zeros(
+                unlabeled_block.shape + (3,), dtype=np.int32
             )  # add a color channel
-            unlabeled_block[nz_mask] = np.random.randint(0, 256, size=(3,))
-            unlabeled_blocks[index[:-1]] = unlabeled_block
+            color = np.random.randint(0, 256, size=(3,))
+            colored_chunk[nz_mask] = color
+            # unlabeled_block[nz_indices + (slice(None),)] = random_colors
+            # print(f"colored chunk: {colored_chunk.shape}")
+            unlabeled_blocks[index[:-1]] = colored_chunk
 
     # put all blocks together
     block_labeled = da.block(labeled_blocks.tolist())
@@ -198,7 +203,8 @@ if __name__ == "__main__":
     if not os.path.exists(debug_dir):
         os.makedirs(debug_dir)
 
-    chunks = [20, 25, 30, 35, 40, 45, 50, 55]
+    # chunks = [20, 25, 30, 35, 40, 45, 50, 55]
+    chunks = [55]
 
     for chunk in tqdm(chunks):
         seg_vol, debug_vol = segment_cellpose(
