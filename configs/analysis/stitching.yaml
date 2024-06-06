@@ -1,0 +1,24 @@
+expname: anystar_validation
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+# file convention -> chunk_<chunk-size>.tiff
+# gt proxy -> gt_proxy.tiff
+# note: only tiff files are supported for now
+data:
+    data_dir: /om2/user/ckapoor/lsm-segmentation/cellpose_chunks/
+
+analysis:
+    voxel_shape: (512, 512, 512)
+    #models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical']
+    do_stitching: True
+    resolution: 300 # DPI resolution of plots
+
+    stitching:
+        metrics: ['iou', 'count']
+        chunk_sizes: [64, 128, 256, 512]
+
+    
+
+training:
+    log_root_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis       # logging directory
+    exp_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis/stitching/
