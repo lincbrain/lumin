@@ -1,0 +1,30 @@
+expname: distributed-segmentation
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+data:
+    data_dir: None
+    dataset_type: 'dandiset'
+    url: https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/
+    scale: 0
+
+model:
+    debug: False
+    channels: [[0, 0]]
+    boundary: 'reflect'
+    diameter: [30, 7.5, 7.5]
+    use_anisotropy: True
+
+    stitching:
+        iou_depth: 2
+        iou_threshold: 0.7
+
+segmentation:
+    vol_lims: [1000, 1000, 1000] # starting sub-voxel indices
+    voxel_shape: [64, 64, 64] # run on a small subset of data
+    chunk_sizes: [8, 16, 32, 64]
+    models: ['cellpose']
+    #models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical']
+
+training:
+    log_root_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis       # logging directory
+    exp_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis/stitching/

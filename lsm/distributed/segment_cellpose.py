@@ -15,13 +15,13 @@ from lsm.processing.normalize import normalize_image
 from lsm.distributed.distributed_seg import link_labels
 
 
-def segment_cellpose(
+def segment(
     image: dask.array,
     debug: Optional[bool] = False,
     channels: Optional[List[int]] = [[0, 0]],
     model_type: Optional[str] = "nuclei",
     boundary: Optional[str] = "reflect",
-    diameter: Tuple[float] = None,
+    diameter: List[float] = None,
     chunk: Optional[int] = None,
     use_anisotropy: Optional[bool] = True,
     iou_depth: Optional[int] = 2,
