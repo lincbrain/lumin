@@ -4,7 +4,7 @@ from typing import Optional
 import pandas as pd
 from scipy import stats
 
-from lsm.evaluation.plotting import box_plot, line_plot
+from lsm.evaluation.plotting import Plots
 
 
 class StitchingAnalysis:
@@ -38,53 +38,72 @@ class StitchingAnalysis:
 
     def descriptive_stats(self):
         # display descriptive statistics
-        stats_summary = self.dataframe.groupby(self.var_name)[self.metric_name].agg(
-            ["mean", "std", "var"]
+        if self.metric_name not in self.dataframe.columns:
+            raise ValueError(f"{self.metric_name} not computed.")
+
+        data = self.dataframe[self.metric_name].values
+
+        mean = np.mean(data)
+        # bessel's correction (ddof=1)
+        std = np.std(data, ddof=1)
+        var = np.var(data, ddof=1)
+
+        stats_summary = pd.DataFrame(
+            {"mean": [mean], "std": [std], "var": [var]}, index=[self.metric_name]
         )
-        print(f"Descriptive statistics: {stats_summary}\n")
+
         return stats_summary
 
-    def oneway_anova(self):
-        # perform one-way anova
-        metric_list = [
-            self.dataframe[self.dataframe[self.var_name] == chunk][self.metric_name]
-            for chunk in self.dataframe[self.var_name].unique()
-        ]
-        anova_result = stats.f_oneway(*metric_list)
-        print(f"ANOVA: {anova_result}\n")
+    def kruskal_test(self):
+        # perform kruskal h-test
+        # since our sample size is just 1
+        if self.var_name not in self.dataframe.columns:
+            raise ValueError(
+                f"Column '{self.var_name}' does not exist in the dataframe."
+            )
+        if self.metric_name not in self.dataframe.columns:
+            raise ValueError(
+                f"Column '{self.metric_name}' does not exist in the dataframe."
+            )
 
-        return anova_result
+        grouped_data = self.dataframe.groupby(self.var_name)[self.metric_name].apply(
+            list
+        )
+
+        f_val, p_val = stats.kruskal(*grouped_data)
+
+        if p_val < 0.05:
+            print(
+                f"null hypothesis rejected, ie: population medians are unequal (p < 0.05)\n"
+            )
+
+        return p_val
 
     def all_analysis(self):
         all_stats = self.descriptive_stats()
-        anova_result = self.oneway_anova()
+        kruskal_result = self.kruskal_test()
 
         # make plots
-        box_plot(
+        plot_obj = Plots(
             data=self.dataframe,
             metric_name=self.metric_name,
             var_name=self.var_name,
             save_path=self.save_path,
             resolution=self.resolution,
         )
-        line_plot(
-            data=all_stats,
-            metric_name=self.metric_name,
-            var_name=self.var_name,
-            save_path=self.save_path,
-            resolution=self.resolution,
-        )
+        plot_obj.bar_plot()
+        plot_obj.point_plot()
 
-        return all_stats, anova_result
+        return all_stats, kruskal_result
 
 
 if __name__ == "__main__":
     iou_scores = {
-        "20": np.random.rand(100),
-        "30": np.random.rand(100),
-        "40": np.random.rand(100),
-        "50": np.random.rand(100),
-        "60": np.random.rand(100),
+        "20": np.random.rand(1),
+        "30": np.random.rand(1),
+        "40": np.random.rand(1),
+        "50": np.random.rand(1),
+        "60": np.random.rand(1),
     }
 
     analysis = StitchingAnalysis(

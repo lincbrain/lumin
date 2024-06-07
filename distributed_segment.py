@@ -47,6 +47,9 @@ def main_function(args):
     dataset = get_data(args)
 
     # TODO: save GT image volume too
+    gt_path = os.path.join(exp_dir, f"gt_proxy.tiff")
+    gt_vol = next(iter(dataset))[-1]["orig_vol"]
+    imwrite(gt_path, gt_vol)
 
     # run distributed segmentation
     for model in tqdm(args.segmentation.models):

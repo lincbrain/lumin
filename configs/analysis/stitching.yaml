@@ -8,14 +8,14 @@ data:
     data_dir: /om2/user/ckapoor/lsm-segmentation/cellpose_chunks/
 
 analysis:
-    voxel_shape: (512, 512, 512)
+    voxel_shape: (256, 256, 256)
     #models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical']
     do_stitching: True
     resolution: 300 # DPI resolution of plots
 
     stitching:
         metrics: ['iou', 'count']
-        chunk_sizes: [64, 128, 256, 512]
+        chunk_sizes: [64, 128, 256]
 
     
 

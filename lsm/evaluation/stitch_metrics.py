@@ -18,18 +18,27 @@ class StitchMetrics:
         # define a constant for numerical stability
         self.eps = 1e-7
 
+    def _binarize_vol(self, vol: np.ndarray):
+        # binarize an image to [0, 255]
+        binary_vol = np.zeros_like(vol, dtype=vol.dtype)
+        binary_vol[vol != 0] = 255
+
+        return binary_vol
+
     def compute_mean_iou(self, vol: np.ndarray):
         # we modify the volumes to be binarized
         # binarize volumes
-        gt_binary = self.gt.copy()
-        gt_binary[gt_binary != 0] = 255
-        vol_binary = vol.copy()
-        vol_binary[vol_binary != 0] = 255
+        if self.gt.shape != vol.shape:
+            raise ValueError(f"volumes must have identical shapes")
+
+        # binarize volumes
+        binary_gt = self._binarize_vol(vol=self.gt)
+        binary_seg = self._binarize_vol(vol=vol)
 
         # compute iou
-        intersection = np.sum(np.logical_and(gt_binary, vol_binary))
-        union = np.sum(np.logical_or(gt_binary, vol_binary))
-        iou = intersection / (union + 1e-7)
+        intersection = np.logical_and(binary_gt, binary_seg).sum()
+        union = np.logical_or(binary_gt, binary_seg).sum()
+        iou = intersection / (union + self.eps)
 
         return iou
 

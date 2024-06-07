@@ -194,9 +194,10 @@ if __name__ == "__main__":
     vol_scale = dask_data[scale][0]
     vol_scale = np.transpose(vol_scale, (1, 2, 3, 0))
 
-    chunk_size = 512
+    # chunk_size = 512
+    chunk_size = 128
     voxel = vol_scale[
-        700 : 700 + chunk_size, 700 : 700 + chunk_size, 700 : 700 + chunk_size
+        1000 : 1000 + chunk_size, 650 : 650 + chunk_size, 3500 : 3500 + chunk_size
     ]
 
     from tifffile import imsave
@@ -207,15 +208,13 @@ if __name__ == "__main__":
 
     # chunks = [20, 25, 30, 35, 40, 45, 50, 55]
     # chunks = [55]
-    chunks = [64, 128, 256, 512]
+    chunks = [16, 32, 64, 128]
 
     for chunk in tqdm(chunks):
         # seg_vol, debug_vol = segment_cellpose(
         # image=voxel, diameter=(7.5 * 4, 7.5, 7.5), debug=False, chunk=chunk
         # )
-        seg_vol = segment_cellpose(
-            image=voxel, diameter=(7.5 * 4, 7.5, 7.5), chunk=chunk
-        )
+        seg_vol = segment(image=voxel, diameter=(7.5 * 4, 7.5, 7.5), chunk=chunk)
 
         with ProgressBar():
             with dask.config.set(scheduler="synchronous"):

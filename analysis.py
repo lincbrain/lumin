@@ -45,17 +45,16 @@ def main_function(args):
 
     # load data
     data_dir = args.data.data_dir
-    print(f"args: {args}")
     chunks = args.analysis.stitching.chunk_sizes
-    gt_vol = imread(os.path.join(data_dir, "gt_proxy.tiff"))
+    gt_vol = imread(os.path.join(exp_dir, "chunk_256.tiff"))
     stitched_vols = [
-        imread(os.path.join(data_dir, f"chunk_{csize}.tiff")) for csize in chunks
+        imread(os.path.join(exp_dir, f"chunk_{csize}.tiff")) for csize in chunks
     ]
 
     # plot iou + nuclei count
     if args.analysis.do_stitching:
         # compute stitching metrics
-        for metric in args.stitching.metrics:
+        for metric in args.analysis.stitching.metrics:
             print(f"Computing {metric} for stitching...")
             stitching_metrics = StitchMetrics(
                 gt_proxy=gt_vol,
@@ -72,9 +71,9 @@ def main_function(args):
                 save_path=exp_dir,
                 resolution=args.analysis.resolution,
             )
-            all_stats, anova_result = stitching_stats.all_analysis()
+            all_stats, kruskal_result = stitching_stats.all_analysis()
             print(f"Descriptive statistics: {all_stats}")
-            print(f"Results from one-way ANOVA: {anova_result}")
+            print(f"Results from kruskal's h-test (p value): {kruskal_result:.3f}")
 
 
 if __name__ == "__main__":

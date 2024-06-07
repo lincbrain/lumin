@@ -104,10 +104,6 @@ if __name__ == "__main__":
     )
 
     print(f"seg uq: {np.unique(seg)}")
-    orig = vol_scale[
-        2000 : 2000 + chunk_size, 2000 : 2000 + chunk_size, 2000 : 2000 + chunk_size
-    ].compute()
-    from tifffile import imwrite
 
     imwrite(f"seg_cellpose.tiff", seg)
 
