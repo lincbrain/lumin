@@ -46,7 +46,7 @@ def main_function(args):
     # load data
     data_dir = args.data.data_dir
     chunks = args.analysis.stitching.chunk_sizes
-    gt_vol = imread(os.path.join(exp_dir, "chunk_256.tiff"))
+    gt_vol = imread(os.path.join(exp_dir, "gt_proxy.tiff"))
     stitched_vols = [
         imread(os.path.join(exp_dir, f"chunk_{csize}.tiff")) for csize in chunks
     ]

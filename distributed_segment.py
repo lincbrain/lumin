@@ -46,13 +46,18 @@ def main_function(args):
     # lazy load data as a dask array
     dataset = get_data(args)
 
-    # TODO: save GT image volume too
-    gt_path = os.path.join(exp_dir, f"gt_proxy.tiff")
     gt_vol = next(iter(dataset))[-1]["orig_vol"]
-    imwrite(gt_path, gt_vol)
+    # TODO: create GT proxy for each model
+
+    # imwrite(gt_path, gt_vol)
 
     # run distributed segmentation
     for model in tqdm(args.segmentation.models):
+        save_dir = os.path.join(exp_dir, f"{model}_seg")
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
+
         print(f"Running stitching with {model}...")
         # load model, as a segmentation function
         segment_func = get_model(model=model)
@@ -69,8 +74,44 @@ def main_function(args):
                 "iou_threshold": args.model.stitching.iou_threshold,
             }
 
-        elif model in ["anystar", "anystar-gaussian"]:
-            return None
+        elif model in ["anystar", "anystar-gaussian", "anystar-spherical"]:
+            img_vol = next(iter(dataset))[-1]
+
+            cfg_dict = {
+                "image": img_vol["orig_vol"],
+                "scale": args.model.scale,
+                "debug": args.model.debug,
+                "boundary": args.model.boundary,
+                "diameter": args.model.diameter,
+                "use_anisotropy": args.model.use_anisotropy,
+                "iou_depth": args.model.stitching.iou_depth,
+                "iou_threshold": args.model.stitching.iou_threshold,
+            }
+
+            # separate check for weights and hyperparameters
+            if model == "anystar":
+                cfg_dict["model_folder"] = args.model.anystar.model_folder
+                cfg_dict["model_name"] = args.model.anystar.model_name
+                cfg_dict["weight_name"] = args.model.anystar.weight_name
+                cfg_dict["prob_thresh"] = args.model.anystar.prob_thresh
+                cfg_dict["nms_thresh"] = args.model.anystar.nms_thresh
+            elif model == "anystar-gaussian":
+                cfg_dict["model_folder"] = args.model.anystar_gaussian.model_folder
+                cfg_dict["model_name"] = args.model.anystar_gaussian.model_name
+                cfg_dict["weight_name"] = args.model.anystar_gaussian.weight_name
+                cfg_dict["prob_thresh"] = args.model.anystar_gaussian.prob_thresh
+                cfg_dict["nms_thresh"] = args.model.anystar_gaussian.nms_thresh
+            elif model == "anystar-spherical":
+                cfg_dict["model_folder"] = args.model.anystar_spherical.model_folder
+                cfg_dict["model_name"] = args.model.anystar_spherical.model_name
+                cfg_dict["weight_name"] = args.model.anystar_spherical.weight_name
+                cfg_dict["prob_thresh"] = args.model.anystar_spherical.prob_thresh
+                cfg_dict["nms_thresh"] = args.model.anystar_spherical.nms_thresh
+            else:
+                raise NotImplementedError(
+                    f"Anystar model type: {model} not implemented. Try one of [anystar, anystar-gaussian, anystar-spherical]"
+                )
+
         elif model == "stardist3d":
             return None
         else:
@@ -84,7 +125,8 @@ def main_function(args):
             with ProgressBar():
                 with dask.config.set(scheduler="synchronous"):
                     seg_vol = seg_vol.compute()
-                    fpath = os.path.join(exp_dir, f"chunk_{chunk}.tiff")
+
+                    fpath = os.path.join(save_dir, f"chunk_{chunk}.tiff")
                     imwrite(fpath, seg_vol)
 
 

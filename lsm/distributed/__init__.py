@@ -1,8 +1,8 @@
 def get_model(model):
     if model == "cellpose":
         from .segment_cellpose import segment
-    elif model in ["anystar", "anystar-gaussian"]:
-        from .segment_anystar import segment
+    elif model in ["anystar", "anystar-gaussian", "anystar-spherical"]:
+        from .segment_steerable import segment
     elif model == "stardist3d":
         from .segment_cellpose import segment
     else:

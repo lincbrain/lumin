@@ -25,7 +25,6 @@ def get_data(args, return_val=False, val_downscale=1.0, **overwrite_cfgs):
     cfgs.update(overwrite_cfgs)
     dataset = ImageDataset(**cfgs)
     if return_val:
-        # cfgs["downscale"] = val_downscale
         val_dataset = ImageDataset(**cfgs)
         return dataset, val_dataset
     else:
