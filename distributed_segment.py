@@ -47,9 +47,6 @@ def main_function(args):
     dataset = get_data(args)
 
     gt_vol = next(iter(dataset))[-1]["orig_vol"]
-    # TODO: create GT proxy for each model
-
-    # imwrite(gt_path, gt_vol)
 
     # run distributed segmentation
     for model in tqdm(args.segmentation.models):
@@ -112,10 +109,87 @@ def main_function(args):
                     f"Anystar model type: {model} not implemented. Try one of [anystar, anystar-gaussian, anystar-spherical]"
                 )
 
-        elif model == "stardist3d":
-            return None
         else:
             raise NotImplementedError
+
+        if args.model.save_gt_proxy:
+            print(f"Saving ground truth proxy for stitching analysis (model: {model})")
+            impath = os.path.join(save_dir, f"gt_proxy.tiff")
+            try:
+                if model == "cellpose":
+                    from cellpose import models
+
+                    model = models.Cellpose(gpu=True, model_type="nuclei")
+                    gt_proxy, _, _, _ = model.eval(
+                        gt_vol,
+                        channels=args.model.channels,
+                        z_axis=0,
+                        channel_axis=3,
+                        diameter=args.model.diameter[1],
+                        do_3D=True,
+                        anisotropy=args.model.use_anisotropy,
+                        augment=True,
+                        tile=True,
+                    )
+                    imwrite(impath, gt_proxy)
+                elif model in ["anystar", "anystar-gaussian", "anystar-spherical"]:
+                    from stardist.models import StarDist3D
+
+                    # normalize voxel
+                    x = gt_vol.compute()  # convert to numpy array
+                    upper = np.percentile(x, 99.9)
+                    x = np.clip(x, 0, upper)
+                    x = (x - x.min()) / (x.max() - x.min())
+                    x = x[..., 0]
+
+                    model = StarDist3D()
+                    model.trainable = False
+                    model.keras_model.trainable = False
+
+                    # choose appropriate model weights
+                    if model == "anystar":
+                        model.name = args.model.anystar.model_name
+                        model.basedir = args.model.anystar.model_folder
+                        model.load_weights(args.model.anystar.weight_name)
+                        gt_proxy, _ = model.predict_instances(
+                            x,
+                            prob_thresh=args.model.anystar.prob_thresh,
+                            nms_thresh=args.model.anystar.nms_thresh,
+                            n_tiles=None,
+                            scale=args.model.scale,
+                        )
+                        imwrite(impath, gt_proxy)
+                    elif model == "anystar-gaussian":
+                        model.name = args.model.anystar_gaussian.model_name
+                        model.basedir = args.model.anystar_gaussian.model_folder
+                        model.load_weights(args.model.anystar_gaussian.weight_name)
+                        gt_proxy, _ = model.predict_instances(
+                            x,
+                            prob_thresh=args.model.anystar_gaussian.prob_thresh,
+                            nms_thresh=args.model.anystar_gaussian.nms_thresh,
+                            n_tiles=None,
+                            scale=args.model.scale,
+                        )
+                        model.load_weights(args.model.anystar_gaussian.weight_name)
+                        imwrite(impath, gt_proxy)
+                    elif model == "anystar-spherical":
+                        model.name = args.model.anystar_spherical.model_name
+                        model.basedir = args.model.anystar_spherical.model_folder
+                        model.load_weights(args.model.anystar_spherical.weight_name)
+                        gt_proxy, _ = model.predict_instances(
+                            x,
+                            prob_thresh=args.model.anystar_spherical.prob_thresh,
+                            nms_thresh=args.model.anystar_spherical.nms_thresh,
+                            n_tiles=None,
+                            scale=args.model.scale,
+                        )
+                        model.load_weights(args.model.anystar_spherical.weight_name)
+                        imwrite(impath, gt_proxy)
+
+            except:
+                raise MemoryError(
+                    f"Voxel chunk size is large. Consider reducing shape from {args.segmentation.voxel_shape}"
+                )
 
         for chunk in tqdm(args.segmentation.chunk_sizes):
             print(f"Running segmentation for chunk size: {chunk}")
