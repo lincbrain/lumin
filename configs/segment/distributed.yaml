@@ -46,7 +46,9 @@ segmentation:
     vol_lims: [1000, 650, 3500] # starting sub-voxel indices
     voxel_shape: [256, 256, 256] # run on a small subset of data
     chunk_sizes: [256, 128, 64, 32] # re-chunked voxel size (default voxel size is 128^3)
-    models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical'] # segmentation models to use
+    #models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical'] # segmentation models to use
+    models: ['cellpose']
+    #models: ['anystar-spherical']
 
 training:
     log_root_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis       # logging directory
