@@ -1,4 +1,5 @@
 import os
+import time
 import operator
 import functools
 import numpy as np
@@ -107,14 +108,17 @@ def segment(
             nz_mask = (unlabeled_block != 0).astype(
                 np.int32
             )  # find non-zero pixel locations
-            colored_chunk = np.zeros(
-                unlabeled_block.shape + (3,), dtype=np.int32
-            )  # add a color channel
-            color = np.random.randint(0, 256, size=(3,))
+            # colored_chunk = np.zeros(
+            #    unlabeled_block.shape + (3,), dtype=np.int32
+            # )  # add a color channel
+            # color = np.random.randint(0, 256, size=(3,), dtype=np.uint8)
+            color = np.random.randint(0, 256, dtype=np.uint8)
             colored_chunk[nz_mask] = color
             unlabeled_blocks[index[:-1]] = colored_chunk
 
     # put all blocks together
+    tick = time.time()
+
     block_labeled = da.block(labeled_blocks.tolist())
 
     if debug:
@@ -156,6 +160,9 @@ def segment(
                 block_unlabeled, depth, boundary=boundary
             )
 
+    tock = time.time()
+    print(f"stitching took: {tock - tick}")
+
     if debug:
         return block_labeled, block_unlabeled
 
@@ -182,6 +189,7 @@ def segment_anystar_chunk(
     model.keras_model.trainable = False
 
     # normalize chunk to [0, 1] before running inference
+    tick = time.time()
     upper = np.percentile(chunk, 99.9)
     chunk = np.clip(chunk, 0, upper)
     chunk = (chunk - chunk.min()) / (chunk.max() - chunk.min())
@@ -192,9 +200,12 @@ def segment_anystar_chunk(
         chunk,
         prob_thresh=prob_thresh,
         nms_thresh=nms_thresh,
-        n_tiles=chunk.shape,
+        n_tiles=None,
+        # n_tiles=chunk.shape,
         scale=scale,
     )
+    tock = time.time()
+    print(f"seg of a chunk took: {tock - tick}")
 
     return seg.astype(np.int32), seg.max()
 
@@ -204,15 +215,17 @@ if __name__ == "__main__":
     from ome_zarr.reader import Reader
 
     url = "https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/"
+    tick = time.time()
     reader = Reader(parse_url(url))
     dask_data = list(reader())[0].data
+    tock = time.time()
+    print(f"streaming: {tock - tick}")
     scale = 0
     vol_scale = dask_data[scale][0]
-    print(f"vs shape: {vol_scale.shape}")
 
     vol_scale = np.transpose(vol_scale, (1, 2, 3, 0))  # (c, z, y, x) -> (z, y, x, c)
 
-    chunk_size = 64
+    chunk_size = 128
     voxel = vol_scale[
         1000 : 1000 + chunk_size, 650 : 650 + chunk_size, 3500 : 3500 + chunk_size
     ]
@@ -221,28 +234,42 @@ if __name__ == "__main__":
 
     # model_name = "gaussian_steerable_run_250k"
     model_name = "spherical_steerable_run"
-    model_folder = "models"
-    # weight_name = "weights_best.h5"
+    model_folder = "../../models"
+    weight_name = "weights_best.h5"
 
-    chunks = [8, 16, 32, 64]
+    from dask.distributed import Client, performance_report
 
+    chunk = 64
+    seg_vol, debug_vol = segment(
+        image=voxel,
+        diameter=(7.5 * 4, 7.5, 7.5),
+        model_name=model_name,
+        model_folder=model_folder,
+        weight_name=weight_name,
+        debug=True,
+    )
+    seg_vol.compute()
+    debug_vol.compute()
+    imwrite(f"debug_anystar.tiff", debug_vol)
+
+    # chunks = [8, 16, 32, 64]
     # model_name = "anystar-mix"
     # model_folder = "models"
-    model = StarDist3D(None, name=model_name, basedir=model_folder)
-    model.load_weights(name="weights_best.h5")
-    model.trainable = False
-    model.keras_model.trainable = False
+    # model = StarDist3D(None, name=model_name, basedir=model_folder)
+    # model.load_weights(name="weights_best.h5")
+    # model.trainable = False
+    # model.keras_model.trainable = False
 
-    # normalize voxel
+    ## normalize voxel
 
-    x = voxel.compute()
-    upper = np.percentile(x, 99.9)
-    x = np.clip(x, 0, upper)
-    x = (x - x.min()) / (x.max() - x.min())
-    x = x[..., 0]
+    # x = voxel.compute()
+    # upper = np.percentile(x, 99.9)
+    # x = np.clip(x, 0, upper)
+    # x = (x - x.min()) / (x.max() - x.min())
+    # x = x[..., 0]
 
-    prob, _ = model.predict(img=x)
-    imwrite(f"./probmap_spherical.tiff", prob)
+    # prob, _ = model.predict(img=x)
+    # imwrite(f"./probmap_spherical.tiff", prob)
     # seg, _ = model.predict_instances(
     #    x,
     #    prob_thresh=0.67,

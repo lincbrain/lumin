@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import itertools
 import numpy as np
 from tqdm import tqdm
 
@@ -22,6 +23,7 @@ from lsm.utils.distributed_util import (
 
 from lsm.evaluation.stitch_metrics import StitchMetrics
 from lsm.evaluation.stitching_stats import StitchingAnalysis
+from lsm.evaluation.segmentation_metrics import SegmentationMetrics
 
 
 def main_function(args):
@@ -43,13 +45,17 @@ def main_function(args):
 
     log.info(f"Analysis log directory: {exp_dir}")
 
+    # load some universal info
+    models = args.analysis.models
+
     # load data
     data_dir = args.data.data_dir
     chunks = args.analysis.stitching.chunk_sizes
-    gt_vol = imread(os.path.join(exp_dir, "gt_proxy.tiff"))
-    stitched_vols = [
-        imread(os.path.join(exp_dir, f"chunk_{csize}.tiff")) for csize in chunks
-    ]
+    # TODO: change gt + stitched volume loading
+    # gt_vol = imread(os.path.join(exp_dir, "gt_proxy.tiff"))
+    # stitched_vols = [
+    #    imread(os.path.join(exp_dir, f"chunk_{csize}.tiff")) for csize in chunks
+    # ]
 
     # plot iou + nuclei count
     if args.analysis.do_stitching:
@@ -74,6 +80,54 @@ def main_function(args):
             all_stats, kruskal_result = stitching_stats.all_analysis()
             print(f"Descriptive statistics: {all_stats}")
             print(f"Results from kruskal's h-test (p value): {kruskal_result:.3f}")
+
+    elif args.analysis.do_segmentation:
+        # all possible model pairs
+        model_pairs = list(itertools.combinations(models, 2))
+        metrics = args.analysis.segmentation.metrics
+
+        # load corresponding volumes
+        for pair in model_pairs:
+            print(f"evaluating model pair: {pair}")
+            model1_path = os.path.join(exp_dir, f"{pair[0]}_seg")
+            model2_path = os.path.join(exp_dir, f"{pair[1]}_seg")
+
+            imnames = sorted(os.listdir(model1_path))
+
+            for imname in imnames:
+                model1_out = imread(os.path.join(model1_path, imname))
+                model2_out = imread(os.path.join(model2_path, imname))
+
+                # instantiate metric class
+                seg_metrics = SegmentationMetrics(
+                    metric=None,
+                    vol1=model1_out,
+                    vol2=model2_out,
+                )
+
+                # compute segmentation metrics for each model pair
+                for metric in metrics:
+                    seg_metrics.metric = metric
+
+                    if args.analysis.segmentation.analyse_prob:
+                        print(f"loading model output probability maps")
+                        # load probability map outputs
+                        model1_prob = imread(
+                            os.path.join(model1_path, f"probmap_{pair[0]}.tiff")
+                        )
+                        model2_prob = imread(
+                            os.path.join(model2_path, f"probmap_{pair[1]}.tiff")
+                        )
+                        seg_metrics.prob1 = model1_prob
+                        seg_metrics.prob2 = model2_prob
+
+                    # compute relevant metric for the model pair
+                    # and construct relevant plots
+                    computed_metric = seg_metrics.compute_metric()
+                    seg_metrics.plot_metric()
+
+    else:
+        raise ValueError("perform either segmentation or stitching analysis")
 
 
 if __name__ == "__main__":

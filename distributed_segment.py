@@ -142,16 +142,18 @@ def main_function(args):
                     x = (x - x.min()) / (x.max() - x.min())
                     x = x[..., 0]
 
-                    model = StarDist3D()
-                    model.trainable = False
-                    model.keras_model.trainable = False
-
                     # choose appropriate model weights
                     if model == "anystar":
-                        model.name = args.model.anystar.model_name
-                        model.basedir = args.model.anystar.model_folder
-                        model.load_weights(args.model.anystar.weight_name)
-                        gt_proxy, _ = model.predict_instances(
+                        seg_network = StarDist3D(
+                            None,
+                            name=args.model.anystar.model_name,
+                            basedir=args.model.anystar.model_folder,
+                        )
+                        seg_network.load_weights(name=args.model.anystar.weight_name)
+                        seg_network.trainable = False
+                        seg_network.keras_model.trainable = False
+
+                        gt_proxy, _ = seg_network.predict_instances(
                             x,
                             prob_thresh=args.model.anystar.prob_thresh,
                             nms_thresh=args.model.anystar.nms_thresh,
@@ -160,30 +162,42 @@ def main_function(args):
                         )
                         imwrite(impath, gt_proxy)
                     elif model == "anystar-gaussian":
-                        model.name = args.model.anystar_gaussian.model_name
-                        model.basedir = args.model.anystar_gaussian.model_folder
-                        model.load_weights(args.model.anystar_gaussian.weight_name)
-                        gt_proxy, _ = model.predict_instances(
+                        seg_network = StarDist3D(
+                            None,
+                            name=args.model.anystar_gaussian.model_name,
+                            basedir=args.model.anystar_gaussian.model_folder,
+                        )
+                        seg_network.load_weights(
+                            name=args.model.anystar_gaussian.weight_name
+                        )
+                        seg_network.trainable = False
+                        seg_network.keras_model.trainable = False
+                        gt_proxy, _ = seg_network.predict_instances(
                             x,
                             prob_thresh=args.model.anystar_gaussian.prob_thresh,
                             nms_thresh=args.model.anystar_gaussian.nms_thresh,
                             n_tiles=None,
                             scale=args.model.scale,
                         )
-                        model.load_weights(args.model.anystar_gaussian.weight_name)
                         imwrite(impath, gt_proxy)
                     elif model == "anystar-spherical":
-                        model.name = args.model.anystar_spherical.model_name
-                        model.basedir = args.model.anystar_spherical.model_folder
-                        model.load_weights(args.model.anystar_spherical.weight_name)
-                        gt_proxy, _ = model.predict_instances(
+                        seg_network = StarDist3D(
+                            None,
+                            name=args.model.anystar_spherical.model_name,
+                            basedir=args.model.anystar_spherical.model_folder,
+                        )
+                        seg_network.load_weights(
+                            name=args.model.anystar_spherical.weight_name
+                        )
+                        seg_network.trainable = False
+                        seg_network.keras_model.trainable = False
+                        gt_proxy, _ = seg_network.predict_instances(
                             x,
                             prob_thresh=args.model.anystar_spherical.prob_thresh,
                             nms_thresh=args.model.anystar_spherical.nms_thresh,
                             n_tiles=None,
                             scale=args.model.scale,
                         )
-                        model.load_weights(args.model.anystar_spherical.weight_name)
                         imwrite(impath, gt_proxy)
 
             except:

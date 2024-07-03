@@ -164,11 +164,16 @@ class SegmentationMetrics:
 
         return intersection.sum() / (float(union.sum()) + self.eps)
 
+    def plot_metric(self):
+        # relevant plots
+        return None
+
     def compute_metric(self):
         metric_list = []
 
         if self.metric == "hausdorff":
             hausdorff = self.haussdorf_distance()
+            self.metric_val = hausdorff
             metric_list.append(hausdorff)
 
         elif self.metric == "mean_geometry":

@@ -33,7 +33,7 @@ model:
 
     anystar_spherical:
         model_folder: 'models'
-        model_name: 'spherical_steerable_run'
+        model_name: spherical_steerable_run
         weight_name: 'weights_best.h5'
         prob_thresh: 0.67
         nms_thresh: 0.3
@@ -45,10 +45,11 @@ model:
 segmentation:
     vol_lims: [1000, 650, 3500] # starting sub-voxel indices
     voxel_shape: [256, 256, 256] # run on a small subset of data
-    chunk_sizes: [256, 128, 64, 32] # re-chunked voxel size (default voxel size is 128^3)
+    #chunk_sizes: [256, 128, 64, 32] # re-chunked voxel size (default voxel size is 128^3)
+    chunk_sizes: [256]
     #models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical'] # segmentation models to use
-    models: ['cellpose']
-    #models: ['anystar-spherical']
+    #models: ['cellpose']
+    models: ['anystar']
 
 training:
     log_root_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis       # logging directory

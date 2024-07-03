@@ -1,0 +1,27 @@
+expname: segmentation_analysis
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+data:
+    data_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis/stitching
+
+analysis:
+    models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical']
+    do_stitching: False     # stitching analysis
+    do_segmentation: True   # segmentation analysis
+    resolution: 300 # DPI resolution of plots
+
+    stitching:
+        metrics: ['iou', 'count']
+        chunk_sizes: [4, 8, 16, 32, 64]
+
+    segmentation:
+        analyse_prob: False
+        #metrics: ['hausdorff', 'mean_geometry', 'kl_divergence', 'entropy', 'nuclei_distance']
+        metrics: ['hausdorff', 'mean_geometry', 'nuclei_distance']
+        chunk_sizes: [32, 64, 128, 256]
+
+
+
+training:
+    log_root_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis       # logging directory
+    exp_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis/stitching/

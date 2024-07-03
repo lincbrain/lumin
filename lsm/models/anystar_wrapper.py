@@ -106,44 +106,15 @@ def anystar_predict_dask(vol):
 
 
 if __name__ == "__main__":
-    model = StarDist3D(None, name="anystar-mix", basedir="model-weights")
+    model = StarDist3D(None, name="anystar-mix", basedir="../../models")
     model.load_weights(name="weights_best.h5")
     model.trainable = False
     model.keras_model.trainable = False
-
-    # fpath = "/om2/user/ckapoor/lsm-segmentation/anystar-data/NucMM-Z/img_0320_0704_0640.nii.gz"
-    # img = nib.load(fpath).get_fdata()
-    ## print(f"type: {type(img)}")
-    ## normalize intensties
-    # img_norm = (img - img.max()) / (img.max() - img.min())
-    # print(f"norm: {img_norm.shape}")
-
-    # labels, _ = model.predict_instances(
-    #    img_norm,
-    #    prob_thresh=0.5,
-    #    n_tiles=(1, 1, 1),
-    #    nms_thresh=0.3,
-    #    scale=[1.0, 1.0, 1.0],
-    # )
 
     cmap = np.random.randint(0, 256, (1000, 3), dtype=np.uint8)
     cmap[0] = [0, 0, 0]
 
     import cv2 as cv
-
-    # for i in [35, 45]:
-    #    cv.imwrite(f"{i}_gt.png", img[..., i])
-    #    seg = cmap[labels[..., i]]
-    #    cv.imwrite(f"{i}_mask.png", seg)
-
-    # visualize some intermediate slices
-    # print(f"uq labels: {np.unique(labels)}")
-    # labels = labels[..., 40]
-
-    # seg_mask = cmap[labels]
-    # print(f"labels shape: {labels.shape}")
-    # cv.imwrite(f"anystar_gt.png", img[..., 40])
-    # cv.imwrite(f"anystar_mask.png", seg_mask[..., 40])
 
     from tifffile import imwrite
     from ome_zarr.io import parse_url
@@ -156,26 +127,26 @@ if __name__ == "__main__":
     vol_scale = dask_data[scale][0][0]
 
     # take an arbitrary (64, 64, 64) voxel
-    chunk_size = 256
+    chunk_size = 64
     voxel = vol_scale[
-        1500 : 1500 + chunk_size, 2000 : 2000 + chunk_size, 3000 : 3000 + chunk_size
+        1000 : 1000 + chunk_size, 650 : 650 + chunk_size, 3500 : 3500 + chunk_size
     ].compute()
 
-    print(f"voxel shape: {voxel.shape}")
     # save voxel for sanity check
-    imwrite(f"dandiset_subvoxel.tiff", voxel)
+    imwrite(f"original_dandiset_subvoxel.tiff", voxel)
 
     # normalize voxel
     voxel_norm = (voxel - voxel.min()) / ((voxel.max() - voxel.min()))
     labels, _ = model.predict_instances(
         voxel_norm,
-        prob_thresh=0.5,
-        n_tiles=(1, 1, 1),
+        prob_thresh=0.67,
         nms_thresh=0.3,
-        scale=[0.25, 0.25, 0.25],
+        n_tiles=(1, 1, 1),
+        scale=[1.0, 1.0, 1.0],
     )
 
-    imwrite(f"label_vol_subvoxel.tiff", labels)
+    print(f"uq: {np.unique(labels)}")
+    imwrite(f"label_vol_anystar.tiff", labels)
     print(f"max: {voxel_norm.max()}")
     print(f"min: {voxel_norm.min()}")
 

@@ -71,7 +71,7 @@ if __name__ == "__main__":
         1000 : 1000 + chunk_size, 650 : 650 + chunk_size, 3500 : 3500 + chunk_size
     ].compute()
 
-    imwrite(f"orig_cellpose.tiff", voxel)
+    # imwrite(f"orig_cellpose.tiff", voxel)
     # normalize voxel, add channel dimension
     axis = 0
     voxel = voxel[np.newaxis, ...]
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
     print(f"seg uq: {np.unique(seg)}")
 
-    imwrite(f"seg_cellpose.tiff", seg)
+    imwrite(f"label_vol_cellpose.tiff", seg)
 
 
 # if __name__ == "__main__":

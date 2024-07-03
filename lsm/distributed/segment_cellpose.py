@@ -1,4 +1,5 @@
 import os
+import time
 import operator
 import functools
 import numpy as np
@@ -95,20 +96,23 @@ def segment(
             # here, we change the image to be 4D, to account for a newly
             # introduced color channel
             unlabeled_block = labeled_block
+            # colored_chunk = np.zeros(unlabeled_block.shape + (3,), dtype=np.uint8)
             colored_chunk = unlabeled_block.copy()
             nz_mask = (unlabeled_block != 0).astype(
                 np.int32
             )  # find non-zero pixel locations
-            colored_chunk = np.zeros(
-                unlabeled_block.shape + (3,), dtype=np.int32
-            )  # add a color channel
-            color = np.random.randint(0, 256, size=(3,))
+            # nz_mask = np.nonzero(unlabeled_block)
+            color = np.random.randint(0, 256, dtype=np.uint8)
+            # color = np.random.randint(0, 256, size=(3,), dtype=np.uint8)
             colored_chunk[nz_mask] = color
+            # colored_chunk[nz_mask] = color
             # unlabeled_block[nz_indices + (slice(None),)] = random_colors
             # print(f"colored chunk: {colored_chunk.shape}")
             unlabeled_blocks[index[:-1]] = colored_chunk
 
     # put all blocks together
+    tick = time.time()
+
     block_labeled = da.block(labeled_blocks.tolist())
 
     if debug:
@@ -150,6 +154,9 @@ def segment(
                 block_unlabeled, depth, boundary=boundary
             )
 
+    tock = time.time()
+    print(f"stitching took: {tock - tick}")
+
     if debug:
         return block_labeled, block_unlabeled
 
@@ -168,6 +175,7 @@ def segment_cellpose_chunk(
 
     model = models.Cellpose(gpu=True, model_type=model_type)
 
+    tick = time.time()
     seg, _, _, _ = model.eval(
         chunk,
         channels=channels,
@@ -179,6 +187,8 @@ def segment_cellpose_chunk(
         augment=True,
         tile=True,
     )
+    tock = time.time()
+    print(f"seg of a chunk took: {tock - tick}")
 
     return seg.astype(np.int32), seg.max()
 
@@ -188,8 +198,12 @@ if __name__ == "__main__":
     from ome_zarr.reader import Reader
 
     url = "https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/"
+    tick = time.time()
     reader = Reader(parse_url(url))
     dask_data = list(reader())[0].data
+    tock = time.time()
+    print(f"streaming: {tock-tick}")
+
     scale = 0
     vol_scale = dask_data[scale][0]
     vol_scale = np.transpose(vol_scale, (1, 2, 3, 0))
@@ -200,24 +214,35 @@ if __name__ == "__main__":
         1000 : 1000 + chunk_size, 650 : 650 + chunk_size, 3500 : 3500 + chunk_size
     ]
 
-    from tifffile import imsave
+    from tifffile import imwrite
 
-    debug_dir = f"./cellpose_chunks"
-    if not os.path.exists(debug_dir):
-        os.makedirs(debug_dir)
+    from dask.distributed import Client, performance_report
+
+    imwrite(f"original_voxel_128.tiff", voxel)
+    chunk = 64
+    seg_vol, debug_vol = segment(image=voxel, diameter=(7.5 * 4, 7.5, 7.5), debug=True)
+    seg_vol.compute()
+    debug_vol.compute()
+    print(f"uq: {np.unique(debug_vol)}")
+    imwrite(f"debug_cellpose.tiff", debug_vol)
+
+    # imwrite(f'')
+    # debug_dir = f"./cellpose_chunks"
+    # if not os.path.exists(debug_dir):
+    #    os.makedirs(debug_dir)
 
     # chunks = [20, 25, 30, 35, 40, 45, 50, 55]
     # chunks = [55]
-    chunks = [16, 32, 64, 128]
+    # chunks = [16, 32, 64, 128]
 
-    for chunk in tqdm(chunks):
-        # seg_vol, debug_vol = segment_cellpose(
-        # image=voxel, diameter=(7.5 * 4, 7.5, 7.5), debug=False, chunk=chunk
-        # )
-        seg_vol = segment(image=voxel, diameter=(7.5 * 4, 7.5, 7.5), chunk=chunk)
+    # for chunk in tqdm(chunks):
+    #    # seg_vol, debug_vol = segment_cellpose(
+    #    # image=voxel, diameter=(7.5 * 4, 7.5, 7.5), debug=False, chunk=chunk
+    #    # )
+    #    seg_vol = segment(image=voxel, diameter=(7.5 * 4, 7.5, 7.5), chunk=chunk)
 
-        with ProgressBar():
-            with dask.config.set(scheduler="synchronous"):
-                seg_vol = seg_vol.compute()
-                imsave(f"./{debug_dir}/chunk_{chunk}.tiff", seg_vol)
-                # imsave(f"./{debug_dir}/debug_cellpose_chunk{chunk}.tiff", debug_vol)
+    #    with ProgressBar():
+    #        with dask.config.set(scheduler="synchronous"):
+    #            seg_vol = seg_vol.compute()
+    #            imsave(f"./{debug_dir}/chunk_{chunk}.tiff", seg_vol)
+    #            # imsave(f"./{debug_dir}/debug_cellpose_chunk{chunk}.tiff", debug_vol)
