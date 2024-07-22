@@ -1,0 +1,56 @@
+expname: distributed-segmentation
+device_ids: 0        # single GPU / DP / DDP; run on all available GPUs;
+
+data:
+    data_dir: None
+    dataset_type: 'dandiset'
+    url: https://dandiarchive.s3.amazonaws.com/zarr/0bda7c93-58b3-4b94-9a83-453e1c370c24/
+    scale: 0    # pyramid scale for the image
+
+model:
+    debug: False                # chunk stitching debug (this saves every re-chunked zarr-voxel with a different color)
+    channels: [[0, 0]]          # parameter for cellpose channel segmentation
+    boundary: 'reflect'         # boundary padding condition for stitching; defaults to 'reflect'. more options: https://docs.dask.org/en/stable/generated/dask.array.pad.html
+    diameter: [30, 7.5, 7.5]    # heuristic nuclei body diameter
+    use_anisotropy: True        # axis anisotropy
+    scale: [1.0, 1.0, 1.0]      # voxel scaling
+    save_prob_map: True         # save model output probability map (default: False); TODO: add code for this
+    save_gt_proxy: True         # save ground truth proxy for stitching analysis (default: True)
+
+    anystar:
+        model_folder: 'models'
+        model_name: 'anystar-mix'
+        weight_name: 'weights_best.h5'
+        prob_thresh: 0.67
+        nms_thresh: 0.3
+
+    anystar_gaussian:
+        model_folder: 'models'
+        model_name: 'gaussian_steerable_run_250k'
+        weight_name: 'weights_best.h5'
+        prob_thresh: 0.67
+        nms_thresh: 0.3
+
+    anystar_spherical:
+        model_folder: 'models'
+        model_name: spherical_steerable_run
+        weight_name: 'weights_best.h5'
+        prob_thresh: 0.67
+        nms_thresh: 0.3
+
+    stitching:
+        iou_depth: 7
+        iou_threshold: 0.7
+
+segmentation:
+    vol_lims: [0, 0, 0] # starting sub-voxel indices
+    voxel_shape: [2048, 2048, 16340] # run on a small subset of data
+    #chunk_sizes: [256, 128, 64, 32] # re-chunked voxel size (default voxel size is 128^3)
+    chunk_sizes: [64]
+    models: ['anystar-gaussian', 'anystar', 'cellpose', 'anystar-spherical'] # segmentation models to use
+    #models: ['cellpose']
+    #models: ['anystar']
+
+training:
+    log_root_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis       # logging directory
+    exp_dir: /om2/user/ckapoor/lsm-segmentation/model_analysis/stitching/

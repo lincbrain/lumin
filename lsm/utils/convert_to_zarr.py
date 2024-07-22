@@ -65,7 +65,7 @@ def tiff_to_zarr(
         print(f"Compute level {level} with shape {new_shape}")
 
         # initialize new image matrix
-        new_array = np.zeros((3, *new_shape))
+        new_array = np.zeros((nchannels, *new_shape))
 
         nz, ny, nx = prev_array.shape[-3:]
         ncz = ceildiv(nz, max_load)
