@@ -63,6 +63,7 @@ class CustomCluster(dask_jobqueue.LSFCluster):
         ncpus,
         min_workers,
         max_workers,
+        per_cpu_mem,
         config={},
         config_name="distributed_cellpose_dask_config.yaml",
         persist_config=False,
@@ -73,6 +74,7 @@ class CustomCluster(dask_jobqueue.LSFCluster):
             ncpus (int): number of CPUs per job
             min_workers (int): minimum number of workers for adaptive scaling
             max_workers (int): maximum number of workers for adaptive scaling
+            per_cpu_mem (int): RAM available per CPU (in GiB)
             config (dict, optional): configuration dictionary for dask. Defaults to an empty dictionary
             config_name (str, optional): name of the configuration file to be saved. Defaults to "distributed_cellpose_dask_config.yaml"
             persist_config (bool, optional): flag indicating whether to persist the dask configuration file. Defaults to False
@@ -112,8 +114,8 @@ class CustomCluster(dask_jobqueue.LSFCluster):
             ncpus=ncpus,
             processes=1,
             cores=1,
-            memory=str(15 * ncpus) + "GB",
-            mem=int(15e9 * ncpus),
+            memory=str(per_cpu_mem * ncpus) + "GB",
+            mem=int(16e9 * ncpus),
             job_script_prologue=job_script_prologue,
             job_cls=quietLSFJob,
             **kwargs,
@@ -214,10 +216,12 @@ def cluster(f):
 if __name__ == "__main__":
     # test cluster class
     # we just need to specify number of cpus, min / max workers
+    # and per cpu memory
     cluster_kwargs = {
         "ncpus": 2,
         "min_workers": 10,
         "max_workers": 100,
+        "per_cpu_mem": 16,
     }
     with CustomCluster(**cluster_kwargs) as cluster:
         print(f"initializing cluster...")
